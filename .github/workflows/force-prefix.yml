@@ -19,11 +19,12 @@ jobs:
       - name: Check and Fix Prefix
         run: |
           actor="${{ github.actor }}"
-          echo "commit pushed by: $actor"
+          echo commit pushed by: $actor"
 
           if [ "$actor" = "mango2man3" ]; then
             echo "mango2man3 is authorized to edit the prefix. skipping check."
           else
+
             # If someone else pushed, make sure command_prefix is set to "!"
             if ! grep -q 'command_prefix="!"' main.py; then
               echo "prefix tamper detected by unauthorized user $actor! restoring exclamation point..."
