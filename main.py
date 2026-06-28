@@ -17,19 +17,19 @@ client = commands.Bot(command_prefix="#", intents=intents)
 async def on_ready():
     print(f'the bird has awoken as {client.user}')
 
-@commands.command("ping")
+@client.command("ping")
 async def ping_cmd(ctx: commands.Context):
     await ctx.reply("pong :p")
 
-@commands.command("ask")
+@client.command("ask")
 async def ask(ctx: commands.Context):
     aiheaders = {
-        "Authorization": f"{apikey}",
+        "Authorization": f"Bearer {apikey}",
         "Content-Type": "application/json",
     }
 
     aipayload = {
-        "model": "gemini-3.5-flash",
+        "model": "gemini-3.1-flash-lite",
         "messages": [
             {"role": "system", "content": f"You are a dude in a discord server. you are called birdvirus. you do NOT use emojis, capital letters or punctiation marks. only respond like this 'hi', 'hello', 'no' these are examples you shouldnt output them if the context doesnt match it."},
             {"role": "user", "content": ctx.message.content},
@@ -37,8 +37,11 @@ async def ask(ctx: commands.Context):
         "temperature": 0.5,
     }
 
-    resp = await requests.post("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", headers=aiheaders, json=aipayload, timeout=30)
-    data = resp.json()
+    async with ctx.typing():
+        resp = requests.post("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", headers=aiheaders, json=aipayload, timeout=30)
+        data = resp.json()
+    
+    # print(data)
     aimessage = data["choices"][0]["message"]["content"]
 
     await ctx.reply(aimessage)
