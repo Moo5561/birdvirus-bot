@@ -34,3 +34,9 @@
 ## Risk Flags
 - `chat` function touches multiple API-related variables and heavily relies on the client state.
 - `client` is used globally for decorators (`@client.command`), which requires passing the `client` object to the modules or using Discord.py Cogs. Migrating to Cogs is recommended to avoid circular dependencies when splitting into modules.
+
+## Smoke Test Results
+- `python -m py_compile main.py` executed successfully without errors.
+- `python -m py_compile bot/*.py` executed successfully without errors.
+- Main logic is completely extracted into `bot/` modules, leaving `main.py` as pure orchestration (wiring up commands, events, config, and running the bot client).
+- The monolithic structure has been fully dismantled into cohesive modules.
