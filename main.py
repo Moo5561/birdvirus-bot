@@ -12,7 +12,7 @@ client = discord.Client(intents=intents)
 
 @client.event
 async def on_ready():
-    print('the bird has awoken.')
+    print(f'the bird has awoken as {client.user}')
 
 client.run(token)
 
