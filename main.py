@@ -14,4 +14,6 @@ client = discord.Client(intents=intents)
 async def on_ready():
     print('the bird has awoken.')
 
+client.run(token)
+
 # add more soon idk
