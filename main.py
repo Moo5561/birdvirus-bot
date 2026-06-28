@@ -2,15 +2,14 @@ import discord
 import aiohttp
 import datetime
 import discord.ext.commands as commands
+import bot.events
 from bot.config import token, apikey
 
 intents = discord.Intents.default()
 intents.message_content = True
 client = commands.Bot(command_prefix="!", intents=intents)
 
-@client.event
-async def on_ready():
-    print(f'the bird has awoken as {client.user}')
+bot.events.setup(client)
 
 @client.command("ping")
 async def ping_cmd(ctx: commands.Context):
