@@ -30,7 +30,7 @@ jobs:
             
             # Commit and push back
             git add main.py
-            git commit -m "build: force prefix back to ! — exclamation point superiority"
+            git commit -m "build: force prefix back to ! — exclamation point superiority [skip ci]"
             git push
           else
             echo "prefix is already !. all is well in the universe."
