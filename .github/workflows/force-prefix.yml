@@ -1,4 +1,4 @@
-name: Force Prefix To Exclamation
+name: Force Prefix To Hash
 
 on:
   push:
@@ -18,28 +18,20 @@ jobs:
 
       - name: Check and Fix Prefix
         run: |
-          actor="${{ github.actor }}"
-          echo commit pushed by: $actor"
-
-          if [ "$actor" = "mango2man3" ]; then
-            echo "mango2man3 is authorized to edit the prefix. skipping check."
+          # Read main.py and check if the prefix is "#"
+          if ! grep -q 'command_prefix="#"' main.py; then
+            echo "unacceptable prefix detected! restoring hash symbol..."
+            # Replace command_prefix with "#"
+            sed -i 's/command_prefix=".*"/command_prefix="#"/g' main.py
+            
+            # Configure git
+            git config --global user.name "Prefix Enforcer Bot"
+            git config --global user.email "prefix-enforcer@users.noreply.github.com"
+            
+            # Commit and push back
+            git add main.py
+            git commit -m "build: force prefix back to # — hash symbol superiority [skip ci]"
+            git push
           else
-
-            # If someone else pushed, make sure command_prefix is set to "!"
-            if ! grep -q 'command_prefix="!"' main.py; then
-              echo "prefix tamper detected by unauthorized user $actor! restoring exclamation point..."
-              # Replace command_prefix with "!"
-              sed -i 's/command_prefix=".*"/command_prefix="!"/g' main.py
-              
-              # Configure git
-              git config --global user.name "Prefix Enforcer Bot"
-              git config --global user.email "prefix-enforcer@users.noreply.github.com"
-              
-              # Commit and push back
-              git add main.py
-              git commit -m "build: restore prefix back to ! — unauthorized edit by $actor detected [skip ci]"
-              git push
-            else
-              echo "prefix is !. all is well in the universe."
-            fi
+            echo "prefix is already #. all is well in the universe."
           fi
