@@ -1,0 +1,37 @@
+name: Force Prefix To Exclamation
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  force-prefix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check and Fix Prefix
+        run: |
+          # Read main.py and check if the prefix is "!"
+          if ! grep -q 'command_prefix="!"' main.py; then
+            echo "unacceptable prefix detected! restoring exclamation point..."
+            # Replace command_prefix with "!"
+            sed -i 's/command_prefix=".*"/command_prefix="!"/g' main.py
+            
+            # Configure git
+            git config --global user.name "Prefix Enforcer Bot"
+            git config --global user.email "prefix-enforcer@users.noreply.github.com"
+            
+            # Commit and push back
+            git add main.py
+            git commit -m "build: force prefix back to ! — exclamation point superiority"
+            git push
+          else
+            echo "prefix is already !. all is well in the universe."
+          fi
