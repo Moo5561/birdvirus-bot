@@ -51,7 +51,7 @@ async def chat(ctx: commands.Context):
             else:
                 messages.append({"role": "user", "content": f"{msg.author.display_name}: {msg.content}"})
 
-    print(messages)
+    # print(messages)
 
     aipayload = {
         "model": "gemini-3.1-flash-lite",
