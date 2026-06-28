@@ -1,14 +1,8 @@
 import discord
 import aiohttp
 import datetime
-from dotenv import load_dotenv
 import discord.ext.commands as commands
-import os
-
-# do the env variables
-load_dotenv()
-token = os.getenv('KEY')
-apikey = os.getenv('API_KEY')
+from bot.config import token, apikey
 
 intents = discord.Intents.default()
 intents.message_content = True
