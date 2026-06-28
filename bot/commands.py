@@ -27,7 +27,7 @@ def setup(client: commands.Bot):
 
         after = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)
         async for msg in ctx.channel.history(limit=10, after=after, oldest_first=True):
-            if msg.content.startswith("#chat "):
+            if msg.content.startswith("!chat "):
                 msg.content = msg.content[5:]
 
             if msg.author == client.user:
@@ -37,7 +37,7 @@ def setup(client: commands.Bot):
 
         if not messages:
             async for msg in ctx.channel.history(limit=5, oldest_first=True):
-                if msg.content.startswith("#chat "):
+                if msg.content.startswith("!chat "):
                     msg.content = msg.content[5:]
                 if msg.author == client.user:
                     messages.append({"role": "assistant", "content": msg.content})
