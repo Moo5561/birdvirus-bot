@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Birdvirus Cloud - Tester</title>
+    <style>
+        body {
+            background-color: #0b0b0c;
+            color: #e2e8f0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        .card {
+            background-color: #16161a;
+            border: 1px solid #24242b;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        h2 {
+            margin-top: 0;
+            color: #f59e0b;
+            border-bottom: 1px solid #24242b;
+            padding-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin-top: 14px;
+            font-weight: 600;
+            font-size: 14px;
+            color: #94a3b8;
+        }
+        input, textarea {
+            background-color: #1f1f27;
+            color: #ffffff;
+            border: 1px solid #3f3f46;
+            padding: 12px;
+            margin-top: 6px;
+            width: 100%;
+            box-sizing: border-box;
+            border-radius: 6px;
+            font-family: inherit;
+        }
+        input:focus, textarea:focus {
+            outline: 1px solid #f59e0b;
+            border-color: #f59e0b;
+        }
+        button {
+            background-color: #f59e0b;
+            color: #000000;
+            border: none;
+            padding: 12px;
+            margin-top: 18px;
+            width: 100%;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #d97706;
+        }
+        .output-header {
+            margin-top: 24px;
+            font-weight: bold;
+            color: #94a3b8;
+        }
+        #output {
+            background-color: #000000;
+            padding: 16px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            border-left: 4px solid #f59e0b;
+            margin-top: 8px;
+            font-family: monospace;
+            min-height: 40px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>⚡ Birdvirus Cloud Endpoint Tester</h2>
+        
+        <label for="apiKey">Gemini API Key:</label>
+        <input type="password" id="apiKey" placeholder="AIzaSy...">
+
+        <label for="prompt">Prompt String:</label>
+        <textarea id="prompt" rows="3">im making a discord bot</textarea>
+
+        <button onclick="runTest()">Execute Request</button>
+
+        <div class="output-header">Response Stream:</div>
+        <div id="output">Awaiting execution...</div>
+    </div>
+
+    <script>
+        async function runTest() {
+            const key = document.getElementById('apiKey').value.trim();
+            const promptText = document.getElementById('prompt').value;
+            const outputDiv = document.getElementById('output');
+
+            if (!key) {
+                outputDiv.innerText = "Execution failed: Missing API Key.";
+                return;
+            }
+
+            outputDiv.innerText = "Pinging endpoint...";
+
+            // Targeted stable 3.1 flash lite route
+            const url = `https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-lite:generateContent?key=${key}`;
+
+            const payload = {
+                contents: [{
+                    parts: [{ text: promptText }]
+                }]
+            };
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const extractedText = data.candidates[0].content.parts[0].text;
+                    outputDiv.innerText = extractedText;
+                } else {
+                    outputDiv.innerText = `Status ${response.status} Error:\n${data.error.message}`;
+                }
+            } catch (err) {
+                outputDiv.innerText = `Network Exception: ${err.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
