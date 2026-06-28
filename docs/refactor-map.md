@@ -11,11 +11,11 @@
 ## Function Registry
 | Name | Line Range | Responsibility | Target Module | Shared State Dependencies |
 |---|---|---|---|---|
-| `on_ready` | 17-19 | Ready event handler | `bot/events.py` | `client` |
-| `ping_cmd` | 21-23 | Ping command | `bot/commands.py` | `client` |
-| `chat` | 25-92 | AI chat command | `bot/commands.py` | `client`, `apikey` |
-| `join` | 93-108 | Join voice command | `bot/commands.py` | `client` |
-| `leave` | 109-115 | Leave voice command | `bot/commands.py` | `client` |
+| `on_ready` | 17-19 | Ready event handler | `bot/events.py` ✅ EXTRACTED | `client` |
+| `ping_cmd` | 21-23 | Ping command | `bot/commands.py` ✅ EXTRACTED | `client` |
+| `chat` | 25-92 | AI chat command | `bot/commands.py` ✅ EXTRACTED | `client`, `apikey` |
+| `join` | 93-108 | Join voice command | `bot/commands.py` ✅ EXTRACTED | `client` |
+| `leave` | 109-115 | Leave voice command | `bot/commands.py` ✅ EXTRACTED | `client` |
 
 ## Module Assignment Plan
 - `bot/core.py`
@@ -40,3 +40,8 @@
 - `python -m py_compile bot/*.py` executed successfully without errors.
 - Main logic is completely extracted into `bot/` modules, leaving `main.py` as pure orchestration (wiring up commands, events, config, and running the bot client).
 - The monolithic structure has been fully dismantled into cohesive modules.
+
+## Final Module Map
+- `bot/config.py`: Environment configuration and Discord client intent setup. Exports `TOKEN`, `API_KEY`, `intents`.
+- `bot/commands.py`: Bot slash commands (ping, chat, join, leave). Exports `setup(client)`.
+- `bot/events.py`: Discord event handlers (on_ready). Exports `setup(client)`.
