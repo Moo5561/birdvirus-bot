@@ -1,2 +1,4 @@
-discord.py
+py-cord
+py-cord[voice]
 python-dotenv
+aiohttp
