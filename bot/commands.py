@@ -8,6 +8,139 @@ from discord import app_commands
 from bot.config import apikey
 import bot.db as db
 
+def draw_card():
+    suits = ['♠', '♥', '♦', '♣']
+    values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+    return (random.choice(values), random.choice(suits))
+
+def calculate_hand(hand):
+    value = 0
+    aces = 0
+    for card, suit in hand:
+        if card in ['J', 'Q', 'K']:
+            value += 10
+        elif card == 'A':
+            value += 11
+            aces += 1
+        else:
+            value += int(card)
+            
+    while value > 21 and aces:
+        value -= 10
+        aces -= 1
+    return value
+
+class BlackjackView(discord.ui.View):
+    def __init__(self, ctx, bet, player_hand, dealer_hand, coin_emoji):
+        super().__init__(timeout=60.0)
+        self.ctx = ctx
+        self.bet = bet
+        self.player_hand = player_hand
+        self.dealer_hand = dealer_hand
+        self.coin_emoji = coin_emoji
+        self.message = None
+
+    def get_embed(self, hide_dealer=True, status="game in progress"):
+        embed = discord.Embed(
+            title="blackjack",
+            color=0x2f3136 if status == "game in progress" else (0x2ecc71 if "won" in status or "blackjack" in status else 0xe74c3c if "lost" in status or "bust" in status else 0x95a5a6)
+        )
+        
+        player_cards = " ".join([f"`{val}{suit}`" for val, suit in self.player_hand])
+        player_score = calculate_hand(self.player_hand)
+        embed.add_field(name=f"your hand (score: {player_score})", value=player_cards, inline=False)
+        
+        if hide_dealer:
+            dealer_cards = f"`{self.dealer_hand[0][0]}{self.dealer_hand[0][1]}` `?`"
+            embed.add_field(name="dealer hand", value=dealer_cards, inline=False)
+        else:
+            dealer_cards = " ".join([f"`{val}{suit}`" for val, suit in self.dealer_hand])
+            dealer_score = calculate_hand(self.dealer_hand)
+            embed.add_field(name=f"dealer hand (score: {dealer_score})", value=dealer_cards, inline=False)
+            
+        embed.add_field(name="bet", value=f"{self.bet} {self.coin_emoji}", inline=True)
+        embed.set_footer(text=status)
+        return embed
+
+    async def start(self, ctx):
+        self.message = await ctx.reply(embed=self.get_embed(), view=self)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message("this is not your game dude", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="hit", style=discord.ButtonStyle.blurple)
+    async def hit_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.player_hand.append(draw_card())
+        player_score = calculate_hand(self.player_hand)
+        
+        if player_score > 21:
+            self.stop()
+            new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, -self.bet)
+            
+            for item in self.children:
+                item.disabled = True
+                
+            embed = self.get_embed(hide_dealer=False, status=f"you busted and lost {self.bet} {self.coin_emoji} (balance: {new_balance})")
+            await interaction.response.edit_message(embed=embed, view=self)
+        else:
+            await interaction.response.edit_message(embed=self.get_embed(), view=self)
+
+    @discord.ui.button(label="stand", style=discord.ButtonStyle.green)
+    async def stand_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.stop()
+        
+        while calculate_hand(self.dealer_hand) < 17:
+            self.dealer_hand.append(draw_card())
+            
+        player_score = calculate_hand(self.player_hand)
+        dealer_score = calculate_hand(self.dealer_hand)
+        
+        if dealer_score > 21:
+            new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, self.bet)
+            status_text = f"dealer busted! you won {self.bet} {self.coin_emoji} (balance: {new_balance})"
+        elif player_score > dealer_score:
+            new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, self.bet)
+            status_text = f"you won {self.bet} {self.coin_emoji} (balance: {new_balance})"
+        elif player_score < dealer_score:
+            new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, -self.bet)
+            status_text = f"you lost {self.bet} {self.coin_emoji} (balance: {new_balance})"
+        else:
+            status_text = "push! it's a tie. bet refunded"
+            
+        for item in self.children:
+            item.disabled = True
+            
+        embed = self.get_embed(hide_dealer=False, status=status_text)
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        
+        while calculate_hand(self.dealer_hand) < 17:
+            self.dealer_hand.append(draw_card())
+            
+        player_score = calculate_hand(self.player_hand)
+        dealer_score = calculate_hand(self.dealer_hand)
+        
+        if dealer_score > 21 or player_score > dealer_score:
+            new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, self.bet)
+            status_text = f"timed out but you won {self.bet} {self.coin_emoji} (balance: {new_balance})"
+        elif player_score < dealer_score:
+            new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, -self.bet)
+            status_text = f"timed out and lost {self.bet} {self.coin_emoji} (balance: {new_balance})"
+        else:
+            status_text = "timed out - pushed (bet refunded)"
+            
+        embed = self.get_embed(hide_dealer=False, status=status_text)
+        try:
+            await self.message.edit(embed=embed, view=self)
+        except:
+            pass
+
 def setup(client: commands.Bot):
     # ping
     @client.hybrid_command(name="ping", description="pong :p")
@@ -256,6 +389,38 @@ def setup(client: commands.Bot):
         else:
             new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, -bet)
             await ctx.reply(f"you lost {bet} {coin_emoji} unlucky dude (balance: {new_balance})")
+
+    @pure_blackjack_command := pure_group.command(name="blackjack", description="play a game of blackjack against the dealer")
+    @app_commands.describe(bet="the amount of coins to bet")
+    async def pure_blackjack(ctx: commands.Context, bet: int):
+        if bet <= 0:
+            await ctx.reply("bet must be greater than zero")
+            return
+            
+        balance = await asyncio.to_thread(db.get_balance, ctx.author.id)
+        if balance < bet:
+            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {balance})")
+            return
+            
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        
+        player_hand = [draw_card(), draw_card()]
+        dealer_hand = [draw_card(), draw_card()]
+        
+        player_total = calculate_hand(player_hand)
+        dealer_total = calculate_hand(dealer_hand)
+        
+        if player_total == 21:
+            if dealer_total == 21:
+                await ctx.reply(f"both got natural blackjack! it's a tie. bet refunded")
+            else:
+                payout = int(bet * 1.5)
+                new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, payout)
+                await ctx.reply(f"natural blackjack! you won {payout} {coin_emoji} (balance: {new_balance})")
+            return
+
+        view = BlackjackView(ctx, bet, player_hand, dealer_hand, coin_emoji)
+        await view.start(ctx)
 
     # Beg command
     @client.hybrid_command(name="beg", description="beg for some coins with low risk")
