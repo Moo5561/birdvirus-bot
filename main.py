@@ -13,8 +13,6 @@ intents = discord.Intents.default()
 intents.message_content = True
 client = commands.Bot(command_prefix="!", intents=intents)
 
-history = {}
-
 @client.event
 async def on_ready():
     print(f'the bird has awoken as {client.user}')
@@ -67,11 +65,6 @@ async def chat(ctx: commands.Context):
     
     # print(data)
     aimessage = data["choices"][0]["message"]["content"]
-
-    history[id].append({
-        "role": "assistant",
-        "content": aimessage
-    })
 
     await ctx.reply(aimessage)
     
