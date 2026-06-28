@@ -1,7 +1,5 @@
 # birdvirus-cloud
 
-This directory is intended for cloud and deployment-related files for the birdvirus Discord bot.
+This directory is intended for stuff not necessarily related to the birdvirus Discord bot.
 
-Add infrastructure, deployment scripts, Dockerfiles, CI/CD workflows, or configuration for cloud providers here.
-
-Created by GitHub Copilot on request of user Moo5561.
+Add random stuff that doesnt have to do with the main bot here.
