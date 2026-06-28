@@ -13,25 +13,15 @@ This repository contains the source code for the birdvirus Discord bot, designed
 
 ## Module Architecture
 
-The core Discord bot functionality has been surgically refactored from a monolithic `main.py` script into a structured modular package located in the `bot/` directory:
-
 - `main.py`: Pure orchestration (entry point, configures the client, loads modules, and starts the bot).
 - `bot/config.py`: Environment configuration and setup of Discord client intents.
 - `bot/commands.py`: Command implementations (e.g., ping, chat, join, leave).
 - `bot/events.py`: Event handlers (e.g., on_ready).
 
-## Getting Started
-
-[Add setup instructions, dependencies, and how to run the bot locally]
-
 ## Features
 
-[List key features and capabilities of the bot]
+Birdvirus Bot is one of the best multipurpose Discord Bots. It has economy, moderation, and even music playing capabilities!
 
-## Contributing
+## kinda disclaimer
 
-[Add contribution guidelines if applicable]
-
-## License
-
-[Specify the license if applicable]
+if you are reading this when the repo is public, the Gemini key in the version history or whatever is DEAD. get rekt scrapers
