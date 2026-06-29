@@ -422,6 +422,204 @@ def setup(client: commands.Bot):
         view = BlackjackView(ctx, bet, player_hand, dealer_hand, coin_emoji)
         await view.start(ctx)
 
+    @pure_slots_command := pure_group.command(name="slots", description="play slots and try to win big")
+    @app_commands.describe(bet="the amount of coins to bet")
+    async def pure_slots(ctx: commands.Context, bet: int):
+        if bet <= 0:
+            await ctx.reply("bet must be greater than zero")
+            return
+            
+        balance = await asyncio.to_thread(db.get_balance, ctx.author.id)
+        if balance < bet:
+            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {balance})")
+            return
+            
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        emojis = ['🍒', '🍋', '🍇', '🔔', '💎', '7️⃣']
+        
+        embed = discord.Embed(title="slots", color=0x2f3136)
+        embed.description = "```\n[  🪙  |  🪙  |  🪙  ]\n```\nspinning..."
+        message = await ctx.reply(embed=embed)
+        
+        await asyncio.sleep(0.8)
+        spin1 = [random.choice(emojis) for _ in range(3)]
+        embed.description = f"```\n[  {spin1[0]}  |  {spin1[1]}  |  {spin1[2]}  ]\n```\nspinning..."
+        await message.edit(embed=embed)
+        
+        await asyncio.sleep(0.8)
+        spin2 = [random.choice(emojis) for _ in range(3)]
+        embed.description = f"```\n[  {spin2[0]}  |  {spin2[1]}  |  {spin2[2]}  ]\n```\nspinning..."
+        await message.edit(embed=embed)
+        
+        await asyncio.sleep(0.8)
+        
+        reels = [random.choice(emojis) for _ in range(3)]
+        unique_count = len(set(reels))
+        
+        if unique_count == 1:
+            match = reels[0]
+            if match == '7️⃣':
+                multiplier = 15
+                status = "jackpot! three 7️⃣s!"
+            elif match == '💎':
+                multiplier = 10
+                status = "mega win! three diamonds!"
+            elif match == '🔔':
+                multiplier = 7
+                status = "big win! three bells!"
+            else:
+                multiplier = 5
+                status = f"three of a kind ({match})!"
+        elif unique_count == 2:
+            if reels[0] == reels[1] or reels[0] == reels[2]:
+                pair = reels[0]
+            else:
+                pair = reels[1]
+                
+            if pair in ['7️⃣', '💎']:
+                multiplier = 2.5
+                status = f"two of a kind ({pair})!"
+            else:
+                multiplier = 1.5
+                status = f"two of a kind ({pair})!"
+        else:
+            multiplier = 0
+            status = "no match. unlucky!"
+            
+        if multiplier > 0:
+            net_gain = int(bet * multiplier) - bet
+        else:
+            net_gain = -bet
+            
+        new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
+        
+        if net_gain > 0:
+            status_text = f"{status}\nyou won {net_gain} {coin_emoji}! (balance: {new_balance})"
+            color = 0xf1c40f if multiplier >= 5 else 0x2ecc71
+        else:
+            status_text = f"{status}\nyou lost {bet} {coin_emoji}. unlucky (balance: {new_balance})"
+            color = 0xe74c3c
+            
+        embed.color = color
+        embed.description = f"```\n[  {reels[0]}  |  {reels[1]}  |  {reels[2]}  ]\n```\n{status_text.lower()}"
+        await message.edit(embed=embed)
+
+    @pure_roulette_command := pure_group.command(name="roulette", description="gamble your coins on a roulette wheel spin")
+    @app_commands.describe(
+        bet="the amount of coins to bet",
+        guess="where to bet: red, black, even, odd, high (19-36), low (1-18), or a specific number (0-36)"
+    )
+    async def pure_roulette(ctx: commands.Context, bet: int, guess: str):
+        if bet <= 0:
+            await ctx.reply("bet must be greater than zero")
+            return
+            
+        balance = await asyncio.to_thread(db.get_balance, ctx.author.id)
+        if balance < bet:
+            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {balance})")
+            return
+            
+        guess_clean = guess.strip().lower()
+        
+        is_number = False
+        target_number = -1
+        try:
+            target_number = int(guess_clean)
+            if 0 <= target_number <= 36:
+                is_number = True
+            else:
+                await ctx.reply("number must be between 0 and 36")
+                return
+        except ValueError:
+            pass
+            
+        valid_bets = ["red", "black", "even", "odd", "high", "low"]
+        if not is_number and guess_clean not in valid_bets:
+            await ctx.reply("invalid guess. choose red, black, even, odd, high, low, or a number from 0 to 36")
+            return
+            
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        red_numbers = {1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36}
+        
+        embed = discord.Embed(title="roulette", color=0x2f3136)
+        embed.description = "spinning the wheel..."
+        message = await ctx.reply(embed=embed)
+        
+        await asyncio.sleep(0.8)
+        dummy_spin1 = random.randint(0, 36)
+        dummy_color1 = "🟢" if dummy_spin1 == 0 else "🔴" if dummy_spin1 in red_numbers else "⚫"
+        embed.description = f"the ball is rolling...\npassing {dummy_color1} {dummy_spin1}..."
+        await message.edit(embed=embed)
+        
+        await asyncio.sleep(0.8)
+        dummy_spin2 = random.randint(0, 36)
+        dummy_color2 = "🟢" if dummy_spin2 == 0 else "🔴" if dummy_spin2 in red_numbers else "⚫"
+        embed.description = f"the ball is slowing down...\npassing {dummy_color2} {dummy_spin2}..."
+        await message.edit(embed=embed)
+        
+        await asyncio.sleep(0.8)
+        
+        spin_result = random.randint(0, 36)
+        if spin_result == 0:
+            result_color = "green"
+            result_color_emoji = "🟢"
+        elif spin_result in red_numbers:
+            result_color = "red"
+            result_color_emoji = "🔴"
+        else:
+            result_color = "black"
+            result_color_emoji = "⚫"
+            
+        win = False
+        multiplier = 0
+        
+        if is_number:
+            if spin_result == target_number:
+                win = True
+                multiplier = 36
+        elif guess_clean == "red":
+            if result_color == "red":
+                win = True
+                multiplier = 2
+        elif guess_clean == "black":
+            if result_color == "black":
+                win = True
+                multiplier = 2
+        elif guess_clean == "even":
+            if spin_result != 0 and spin_result % 2 == 0:
+                win = True
+                multiplier = 2
+        elif guess_clean == "odd":
+            if spin_result % 2 != 0:
+                win = True
+                multiplier = 2
+        elif guess_clean == "high":
+            if 19 <= spin_result <= 36:
+                win = True
+                multiplier = 2
+        elif guess_clean == "low":
+            if 1 <= spin_result <= 18:
+                win = True
+                multiplier = 2
+                
+        if win:
+            net_gain = int(bet * multiplier) - bet
+        else:
+            net_gain = -bet
+            
+        new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
+        
+        if win:
+            status_text = f"the ball landed on {result_color_emoji} {spin_result}!\nyou won {net_gain} {coin_emoji}! (balance: {new_balance})"
+            color = 0x2ecc71
+        else:
+            status_text = f"the ball landed on {result_color_emoji} {spin_result}.\nyou lost {bet} {coin_emoji}. unlucky (balance: {new_balance})"
+            color = 0xe74c3c
+            
+        embed.color = color
+        embed.description = status_text.lower()
+        await message.edit(embed=embed)
+
     # Beg command
     @client.hybrid_command(name="beg", description="beg for some coins with low risk")
     @commands.cooldown(1, 30, commands.BucketType.user)
