@@ -15,6 +15,35 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 2
+
+      - name: Reject Action Edits by Scoopala
+        run: |
+          ACTOR="${{ github.actor }}"
+          COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
+          COMMIT_EMAIL=$(git log -1 --pretty=format:'%ae')
+          
+          if [[ "$ACTOR" == *"Scoopala"* || "$COMMIT_AUTHOR" == *"Scoopala"* || "$COMMIT_EMAIL" == *"Scoopala"* ]]; then
+            echo "detected push/commit by scoopala."
+            if git diff-tree --no-commit-id --name-only -r HEAD | grep -q 'force-prefix.yml'; then
+              echo "scoopala tried to edit the force-prefix action! reverting action file..."
+              
+              # Revert the action file from the previous commit
+              git checkout HEAD~1 -- .github/workflows/force-prefix.yml
+              
+              # Configure git
+              git config --global user.name "Prefix Enforcer Bot"
+              git config --global user.email "prefix-enforcer@users.noreply.github.com"
+              
+              # Commit and push revert
+              git add .github/workflows/force-prefix.yml
+              git commit -m "build: revert unauthorized edits to force-prefix action by scoopala [skip ci]"
+              git push
+              
+              echo "unauthorized edit has been reverted and blocked."
+              exit 1
+            fi
+          fi
 
       - name: Check and Fix Prefix
         run: |
