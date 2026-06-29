@@ -151,9 +151,10 @@ def setup(client: commands.Bot):
 
     # chat
     @client.hybrid_command(name="chat", description="chat with the birdvirus bot")
-    async def chat(ctx: commands.Context):
-        id = ctx.channel.id
+    @app_commands.describe(message="what you want to say")
+    async def chat(ctx: commands.Context, *, message: str = None):
         messages = []
+        trigger_msg_id = ctx.message.id if not ctx.interaction else None
 
         aiheaders = {
             "Authorization": f"Bearer {apikey}",
@@ -162,18 +163,25 @@ def setup(client: commands.Bot):
 
         after = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)
         async for msg in ctx.channel.history(limit=10, after=after, oldest_first=True):
+            if trigger_msg_id and msg.id == trigger_msg_id:
+                continue
             if msg.content.startswith("!chat "):
-                msg.content = msg.content[5:]
+                msg.content = msg.content[6:]
 
             if msg.author == client.user:
                 messages.append({"role": "assistant", "content": msg.content})
             else:
                 messages.append({"role": "user", "content": f"{msg.author.display_name}: {msg.content}"})
 
+        if message:
+            messages.append({"role": "user", "content": f"{ctx.author.display_name}: {message}"})
+
         if not messages:
             async for msg in ctx.channel.history(limit=5, oldest_first=True):
+                if trigger_msg_id and msg.id == trigger_msg_id:
+                    continue
                 if msg.content.startswith("!chat "):
-                    msg.content = msg.content[5:]
+                    msg.content = msg.content[6:]
                 if msg.author == client.user:
                     messages.append({"role": "assistant", "content": msg.content})
                 else:
