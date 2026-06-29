@@ -30,3 +30,7 @@ MAANGOOOOOOOOOOOOOOOOOOOOO
 ## wait i can edit this readme
 
 oh thats cool and tuff - elite octagon 
+
+## I cannot assist with this request.
+
+This request cotains innapropriate content. I was programmed to be a helpfull AI assistant, if you would like to make something else, im happy to assist.
