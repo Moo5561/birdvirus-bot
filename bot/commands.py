@@ -1,4 +1,5 @@
 import aiohttp
+import base64
 import datetime
 import random
 import asyncio
@@ -7,6 +8,7 @@ import discord.ext.commands as commands
 from discord import app_commands
 from bot.config import apikey
 import bot.db as db
+from playwright.async_api import async_playwright
 
 def draw_card():
     suits = ['♠', '♥', '♦', '♣']
@@ -710,6 +712,71 @@ def setup(client: commands.Bot):
     @internet_get_command := internet_group.command(name="get", description="get internet stuff")
     async def internet_get(ctx: commands.Context):
         await ctx.reply("no we are not using ts lol")
+
+    @internet_search_command := internet_group.command(name="search", description="search the web on duckduckgo and describe results")
+    @app_commands.describe(query="what to search for")
+    async def internet_search(ctx: commands.Context, query: str):
+        async with ctx.typing():
+            try:
+                async with async_playwright() as p:
+                    browser = await p.chromium.launch(headless=True)
+                    page = await browser.new_page()
+                    await page.goto("https://duckduckgo.com/")
+                    await page.fill('input[name="q"]', query)
+                    await page.press('input[name="q"]', "Enter")
+                    await page.wait_for_load_state("networkidle")
+                    await page.wait_for_timeout(1000)
+                    screenshot = await page.screenshot(type="png")
+                    await browser.close()
+            except Exception as e:
+                await ctx.reply(f"browser error: {e}")
+                return
+
+            img_base64 = base64.b64encode(screenshot).decode("utf-8")
+
+            aiheaders = {
+                "Authorization": f"Bearer {apikey}",
+                "Content-Type": "application/json",
+            }
+
+            aipayload = {
+                "model": "gemini-3.1-flash-lite",
+                "messages": [
+                    {"role": "system", "content": "you are a dude in a discord server. you are called birdvirus. you do NOT use emojis, capital letters or punctuation marks. keep responses short and casual like a real person texting. do not over explain things. you are looking at a duckduckgo search results page and describing what you see for the user."},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": f"heres a screenshot of duckduckgo search results for '{query}'. describe what you see in a casual and brief way"},
+                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_base64}"}}
+                        ]
+                    }
+                ],
+                "temperature": 0.5,
+            }
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                    headers=aiheaders,
+                    json=aipayload,
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as resp:
+                    data = await resp.json()
+
+        if "choices" not in data:
+            await ctx.reply(f"api error: ```{data}```")
+            return
+
+        if "message" not in data["choices"][0]:
+            await ctx.reply(f"api error: ```{data}```")
+            return
+
+        if "content" not in data["choices"][0]["message"]:
+            await ctx.reply(f"api error: ```{data}```")
+            return
+
+        aimessage = data["choices"][0]["message"]["content"]
+        await ctx.reply(aimessage)
 
     @client.hybrid_command(name="eatbomb", description="eat a highly nutritious consumable bomb")
     async def eat_bomb(ctx: commands.Context):
