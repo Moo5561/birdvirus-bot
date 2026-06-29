@@ -19,10 +19,10 @@ jobs:
       - name: Check and Fix Prefix
         run: |
           # Read main.py and check if the prefix is "!"
-          if ! grep -q 'command_prefix="!"' main.py; then
+          if ! grep -q 'command_prefix="#"' main.py; then
             echo "unacceptable prefix detected! restoring exclamation point..."
             # Replace command_prefix with "!"
-            sed -i 's/command_prefix=".*"/command_prefix="!"/g' main.py
+            sed -i 's/command_prefix=".*"/command_prefix="#"/g' main.py
             
             # Configure git
             git config --global user.name "Prefix Enforcer Bot"
