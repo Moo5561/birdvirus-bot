@@ -630,6 +630,82 @@ def setup(client: commands.Bot):
         embed.description = status_text.lower();
         await message.edit(embed=embed);
 
+    @pure_plinko_command := pure_group.command(name="plinko", description="drop the ball down the plinko board")
+    @app_commands.describe(bet="amount of coins to bet")
+    async def pure_plinko(ctx: commands.Context, bet: int):
+        if bet <= 0:
+            await ctx.reply("bet must be greater than zero")
+            return
+
+        balance = await asyncio.to_thread(db.get_balance, ctx.author.id)
+        if balance < bet:
+            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {balance})")
+            return
+
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+
+        multipliers = [15, 5, 2, 0.5, 2, 5, 15]
+        slot_labels = ['💀', '🔴', '🟠', '🟡', '🟠', '🔴', '💀']
+
+        pos = 3
+        path = [pos]
+        for _ in range(7):
+            pos += random.choice([-1, 1])
+            pos = max(0, min(6, pos))
+            path.append(pos)
+
+        final_slot = path[-1]
+        multiplier = multipliers[final_slot]
+
+        embed = discord.Embed(title="plinko", color=0x2f3136)
+        embed.description = "```\n  ⬇️\n```\ndropping..."
+        message = await ctx.reply(embed=embed)
+
+        for frame in range(1, 8):
+            await asyncio.sleep(0.4)
+            rows = []
+            for r in range(frame):
+                row_pegs = []
+                for c in range(7):
+                    if c == path[r]:
+                        row_pegs.append('🔴')
+                    else:
+                        row_pegs.append('⚪')
+                rows.append(''.join(row_pegs))
+            embed.description = "```\n  ⬇️\n" + "\n".join(rows) + "\n```\ndropping..."
+            await message.edit(embed=embed)
+
+        await asyncio.sleep(0.5)
+
+        slots_row = ''.join([f'[{s}]' for s in slot_labels])
+        mults_row = '  '.join([f'{m}x' for m in multipliers])
+
+        net_gain = int(bet * multiplier) - bet
+        new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
+
+        if net_gain > 0:
+            status = f"landed in {slot_labels[final_slot]} ({multiplier}x)\nyou won {net_gain} {coin_emoji} (balance: {new_balance})"
+            color = 0xf1c40f if multiplier >= 5 else 0x2ecc71
+        elif net_gain == 0:
+            status = f"landed in {slot_labels[final_slot]} ({multiplier}x)\nbroke even (balance: {new_balance})"
+            color = 0x95a5a6
+        else:
+            status = f"landed in {slot_labels[final_slot]} ({multiplier}x)\nyou lost {abs(net_gain)} {coin_emoji} (balance: {new_balance})"
+            color = 0xe74c3c
+
+        embed.color = color
+        rows = []
+        for r in range(8):
+            row_pegs = []
+            for c in range(7):
+                if c == path[r]:
+                    row_pegs.append('🔴')
+                else:
+                    row_pegs.append('⚪')
+            rows.append(''.join(row_pegs))
+        embed.description = "```\n  ⬇️\n" + "\n".join(rows) + f"\n{slots_row}\n{mults_row}\n```\n{status.lower()}"
+        await message.edit(embed=embed)
+
     # Beg command
     @client.hybrid_command(name="beg", description="beg for some coins with low risk")
     @commands.cooldown(1, 30, commands.BucketType.user)
