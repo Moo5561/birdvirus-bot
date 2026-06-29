@@ -711,19 +711,6 @@ def setup(client: commands.Bot):
     async def internet_get(ctx: commands.Context):
         await ctx.reply("no we are not using ts lol")
 
-    @client.hybrid_command(name="randomgif", description="get a free cool gif from my gifs")
-    async def random_gif(ctx: commands.Context):
-        gifs = [
-            "https://cdn.discordapp.com/attachments/1366521106940559470/1499180770500280320/image0.gif ", 
-            "https://cdn.discordapp.com/attachments/1478830458950127797/1499169563064008804/togif.30a22110.gif", 
-            "https://cdn.discordapp.com/attachments/1474959610564841706/1517008268487299092/attachment.gif",
-            "https://tenor.com/view/mango-bird-gif-14282880132606879525",
-            "https://tenor.com/view/joe-coin-joe-coin-emotiguy-emoti-guy-gif-5950636071310089815", 
-            "https://tenor.com/view/boom-boom-cat-boom-cat-nuke-nuclear-cat-boomba-cat-gif-7123677201497573048", 
-            "https://cdn.discordapp.com/attachments/1520142568837353572/1520888335902572695/youre_pin_-_gigachadtrey.gif" 
-        ];
-        await ctx.reply(random.choice(gifs) + "\n **heres ur tuff gif**");
-
     @client.hybrid_command(name="eatbomb", description="eat a highly nutritious consumable bomb")
     async def eat_bomb(ctx: commands.Context):
         cost = 10;
