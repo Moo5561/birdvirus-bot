@@ -723,3 +723,29 @@ def setup(client: commands.Bot):
             "https://cdn.discordapp.com/attachments/1520142568837353572/1520888335902572695/youre_pin_-_gigachadtrey.gif" 
         ];
         await ctx.reply(random.choice(gifs) + "\n **heres ur tuff gif**");
+
+    @client.hybrid_command(name="eatbomb", description="eat a highly nutritious consumable bomb")
+    async def eat_bomb(ctx: commands.Context):
+        cost = 10;
+        balance = await asyncio.to_thread(db.get_balance, ctx.author.id);
+        if balance < cost:
+            await ctx.reply(f"you can't afford a bomb. it costs {cost} coins (your balance: {balance})");
+            return;
+            
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙");
+        
+        # 30% chance of digesting, 70% chance of exploding
+        success = random.random() < 0.30;
+        if success:
+            gain = 25;
+            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, gain);
+            await ctx.reply(f"you digested the bomb successfully! it was extremely nutritious. gained {gain} {coin_emoji} (balance: {new_balance})");
+        else:
+            loss = -10;
+            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, loss);
+            responses = [
+                f"you ate the bomb and blew up. lost {cost} coins for the bomb and {abs(loss)} coins for medical bills (balance: {new_balance})",
+                f"the fuse was still lit. you exploded from the inside out and lost {cost + abs(loss)} coins (balance: {new_balance})",
+                f"it tasted like sulfur and pain. you blew up and lost {cost + abs(loss)} coins (balance: {new_balance})"
+            ];
+            await ctx.reply(random.choice(responses));
