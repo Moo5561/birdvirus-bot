@@ -210,6 +210,23 @@ def setup(client: commands.Bot):
     async def ping_cmd(ctx: commands.Context):
         await ctx.reply("pong :p")
 
+    # Bad Group
+    @client.hybrid_group(name="bad", description="bad commands")
+    async def bad_group(ctx: commands.Context):
+        pass
+
+    @bad_apple_command := bad_group.command(name="apple", description="play bad apple audio in voice channel")
+    async def bad_apple(ctx: commands.Context):
+        if ctx.voice_client is None:
+            await ctx.reply("i'm not in a voice channel. use `/vc join` first");
+            return;
+            
+        try:
+            queue_audio(ctx.voice_client, "badapple.mp3");
+            await ctx.reply("queued bad apple 🍎");
+        except Exception as e:
+            await ctx.reply(f"error playing audio: {e}");
+
     # version
     @client.hybrid_command(name="version", description="show bot version and commit")
     async def version_cmd(ctx: commands.Context):
