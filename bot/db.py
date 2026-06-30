@@ -101,6 +101,20 @@ def clear_say_logs():
     conn.close()
 
 # Economy Functions
+def get_balances(user_id: int) -> tuple[int, int]:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT balance, bank FROM economy WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    if row is None:
+        cursor.execute("INSERT INTO economy (user_id, balance, bank) VALUES (?, 100, 0)", (user_id,))
+        conn.commit()
+        balance, bank = 100, 0
+    else:
+        balance, bank = row[0], row[1]
+    conn.close()
+    return balance, bank
+
 def get_balance(user_id: int) -> int:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()

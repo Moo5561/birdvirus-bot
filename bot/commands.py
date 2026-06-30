@@ -891,12 +891,19 @@ def setup(client: commands.Bot):
     async def balance(ctx: commands.Context, user: discord.Member = None):
         target = user or ctx.author
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        bal = await asyncio.to_thread(db.get_balance, target.id)
+        bal, bank = await asyncio.to_thread(db.get_balances, target.id)
         
-        if target == ctx.author:
-            await ctx.reply(f"you have {bal} {coin_emoji}")
-        else:
-            await ctx.reply(f"{target.display_name} has {bal} {coin_emoji}")
+        embed = discord.Embed(
+            title=f"Balance - {target.display_name}",
+            color=0x3498db
+        )
+        
+        embed.description = f"**Total Balance: **{coin_emoji} `{bal + bank:,}`\n\n**Holding: **💰`{bal:,}`\n**Bank: **🏦`{bank:,}`\n\n-# birdvirus coin in the bank earn interest!"
+        
+        if target.display_avatar:
+            embed.set_thumbnail(url=target.display_avatar.url)
+            
+        await ctx.reply(embed=embed)
 
     # EC Group
     @client.hybrid_group(name="ec", description="economy administration commands")
