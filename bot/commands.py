@@ -182,7 +182,7 @@ def setup(client: commands.Bot):
     # chat
     @client.hybrid_command(name="chat", description="chat with the birdvirus bot")
     @app_commands.describe(message="what you want to say")
-    async def chat(ctx: commands.Context, *, message: str = None):
+    async def chat(ctx: commands.Context, *, message: str):
         messages = []
         trigger_msg_id = ctx.message.id if not ctx.interaction else None
 
