@@ -214,6 +214,35 @@ def setup(client: commands.Bot):
     async def ping_cmd(ctx: commands.Context):
         await ctx.reply("pong :p")
 
+    # gif
+    @client.hybrid_command(name="gif", description="get a free cool gif from my gifs")
+    async def gif_cmd(ctx: commands.Context):
+        gifs = [
+            "https://cdn.discordapp.com/attachments/1366521106940559470/1499180770500280320/image0.gif ", 
+            "https://cdn.discordapp.com/attachments/1478830458950127797/1499169563064008804/togif.30a22110.gif", 
+            "https://cdn.discordapp.com/attachments/1474959610564841706/1517008268487299092/attachment.gif",
+            "https://tenor.com/view/mango-bird-gif-14282880132606879525",
+            "https://tenor.com/view/joe-coin-joe-coin-emotiguy-emoti-guy-gif-5950636071310089815", 
+            "https://tenor.com/view/boom-boom-cat-boom-cat-nuke-nuclear-cat-boomba-cat-gif-7123677201497573048", 
+            "https://cdn.discordapp.com/attachments/1520142568837353572/1520888335902572695/youre_pin_-_gigachadtrey.gif" 
+        ];
+        
+        gif = random.choice(gifs) + "\n **heres ur tuff gif**";
+        
+        if ctx.message and ctx.message.reference and ctx.message.reference.message_id:
+            try:
+                referenced_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id);
+                await referenced_msg.reply(gif);
+                try:
+                    await ctx.message.delete();
+                except discord.Forbidden:
+                    pass;
+                return;
+            except Exception as e:
+                print(f"error replying to referenced message: {e}");
+                
+        await ctx.reply(gif);
+
     # Bad Group
     @client.hybrid_group(name="bad", description="bad commands")
     async def bad_group(ctx: commands.Context):
