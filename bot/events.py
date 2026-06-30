@@ -19,11 +19,26 @@ def setup(client: commands.Bot):
         if "67" in message.content:
             if message.guild and message.guild.voice_client:
                 vc = message.guild.voice_client
-                if vc.is_connected() and not vc.is_playing():
+                if vc.is_connected():
                     try:
-                        vc.play(discord.FFmpegPCMAudio("bird.mp3"))
+                        from bot.commands import audio_queues
+                        guild_id = vc.guild.id
+                        source = "bird.mp3"
+                        
+                        if not vc.is_playing():
+                            def play_next(error, vc_ref, g_id):
+                                if error: print(f"player error: {error}")
+                                if g_id in audio_queues and len(audio_queues[g_id]) > 0:
+                                    src = audio_queues[g_id].pop(0)
+                                    vc_ref.play(discord.FFmpegPCMAudio(src), after=lambda e: play_next(e, vc_ref, g_id))
+                                    
+                            vc.play(discord.FFmpegPCMAudio(source), after=lambda e: play_next(e, vc, guild_id))
+                        else:
+                            if guild_id not in audio_queues:
+                                audio_queues[guild_id] = []
+                            audio_queues[guild_id].append(source)
                     except Exception as e:
-                        print(f"error playing bird on 67: {e}")
+                        print(f"error queueing bird on 67: {e}")
 
     @client.event
     async def on_command_error(ctx: commands.Context, error):

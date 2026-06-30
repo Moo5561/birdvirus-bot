@@ -161,16 +161,35 @@ class BlackjackView(discord.ui.View):
         except:
             pass
 
+audio_queues = {}
+
 def setup(client: commands.Bot):
+    def play_next(error, vc, guild_id):
+        if error:
+            print(f"player error: {error}")
+            
+        if guild_id in audio_queues and len(audio_queues[guild_id]) > 0:
+            source = audio_queues[guild_id].pop(0)
+            vc.play(discord.FFmpegPCMAudio(source), after=lambda e: play_next(e, vc, guild_id))
+
+    def queue_audio(vc, source):
+        guild_id = vc.guild.id
+        if not vc.is_playing():
+            vc.play(discord.FFmpegPCMAudio(source), after=lambda e: play_next(e, vc, guild_id))
+        else:
+            if guild_id not in audio_queues:
+                audio_queues[guild_id] = []
+            audio_queues[guild_id].append(source)
+
     @tasks.loop(seconds=15.0)
     async def voice_announcer():
         for vc in client.voice_clients:
-            if vc.is_connected() and not vc.is_playing():
+            if vc.is_connected():
                 if random.random() < 0.80:
                     try:
-                        vc.play(discord.FFmpegPCMAudio("bird.mp3"));
+                        queue_audio(vc, "bird.mp3")
                     except Exception as e:
-                        print(f"error playing bird in vc: {e}");
+                        print(f"error queueing bird in vc: {e}");
                         
     @client.listen('on_ready')
     async def start_voice_announcer():
