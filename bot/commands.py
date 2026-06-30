@@ -178,12 +178,16 @@ def setup(client: commands.Bot):
             
         if guild_id in audio_queues and len(audio_queues[guild_id]) > 0:
             source = audio_queues[guild_id].pop(0)
-            vc.play(discord.FFmpegPCMAudio(source), after=lambda e: play_next(e, vc, guild_id))
+            vol = 0.25 if "badapple" in source else 0.6
+            audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(source), volume=vol)
+            vc.play(audio_source, after=lambda e: play_next(e, vc, guild_id))
 
     def queue_audio(vc, source):
         guild_id = vc.guild.id
         if not vc.is_playing():
-            vc.play(discord.FFmpegPCMAudio(source), after=lambda e: play_next(e, vc, guild_id))
+            vol = 0.25 if "badapple" in source else 0.6
+            audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(source), volume=vol)
+            vc.play(audio_source, after=lambda e: play_next(e, vc, guild_id))
         else:
             if guild_id not in audio_queues:
                 audio_queues[guild_id] = []
@@ -376,7 +380,8 @@ def setup(client: commands.Bot):
             
         try:
             audio_file = "birdvirus.mp3" if random.random() < 0.50 else "bird.mp3"
-            ctx.voice_client.play(discord.FFmpegPCMAudio(audio_file));
+            audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(audio_file), volume=0.6);
+            ctx.voice_client.play(audio_source);
             await ctx.reply(audio_file.replace(".mp3", ""), ephemeral=True);
         except Exception as e:
             await ctx.reply(f"error playing audio: {e}");
