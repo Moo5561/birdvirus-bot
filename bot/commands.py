@@ -225,13 +225,21 @@ def setup(client: commands.Bot):
     # version
     @client.hybrid_command(name="version", description="show bot version and commit")
     async def version_cmd(ctx: commands.Context):
+        import sys
+        host = "unknown"
+        if "--host" in sys.argv:
+            try:
+                host = sys.argv[sys.argv.index("--host") + 1]
+            except IndexError:
+                pass
+                
         try:
             with open("version.txt", "r") as f:
                 content = f.read().strip()
             
-            await ctx.reply(f"birdvirus bot\n{content}")
+            await ctx.reply(f"birdvirus bot\n{content}\ncurrent host: `{host}`")
         except Exception:
-            await ctx.reply("birdvirus bot\ncommit: unknown")
+            await ctx.reply(f"birdvirus bot\ncommit: unknown\ncurrent host: `{host}`")
 
     # chat
     @client.hybrid_command(name="chat", description="chat with the birdvirus bot")
