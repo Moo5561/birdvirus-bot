@@ -2,3 +2,4 @@ discord.py[voice]
 python-dotenv
 aiohttp
 playwright
+PyNaCl
