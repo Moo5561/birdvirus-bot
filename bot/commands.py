@@ -630,9 +630,10 @@ def setup(client: commands.Bot):
         embed.description = status_text.lower();
         await message.edit(embed=embed);
 
-    @pure_plinko_command := pure_group.command(name="plinko", description="drop the ball down the plinko board")
+    # Plinko command
+    @client.hybrid_command(name="plinko", description="horse plinko race — drop the horse and win")
     @app_commands.describe(bet="amount of coins to bet")
-    async def pure_plinko(ctx: commands.Context, bet: int):
+    async def plinko(ctx: commands.Context, bet: int):
         if bet <= 0:
             await ctx.reply("bet must be greater than zero")
             return
@@ -646,6 +647,7 @@ def setup(client: commands.Bot):
 
         multipliers = [15, 5, 2, 0.5, 2, 5, 15]
         slot_labels = ['💀', '🔴', '🟠', '🟡', '🟠', '🔴', '💀']
+        horse_emojis = ['🐎', '🐴', '🦄', '🐴', '🐎']
 
         pos = 3
         path = [pos]
@@ -657,8 +659,8 @@ def setup(client: commands.Bot):
         final_slot = path[-1]
         multiplier = multipliers[final_slot]
 
-        embed = discord.Embed(title="plinko", color=0x2f3136)
-        embed.description = "```\n  ⬇️\n```\ndropping..."
+        embed = discord.Embed(title="horse plinko", color=0x2f3136)
+        embed.description = "```\n  ⬇️\n```\nthe horses are off..."
         message = await ctx.reply(embed=embed)
 
         for frame in range(1, 8):
@@ -668,11 +670,11 @@ def setup(client: commands.Bot):
                 row_pegs = []
                 for c in range(7):
                     if c == path[r]:
-                        row_pegs.append('🔴')
+                        row_pegs.append('🐎')
                     else:
                         row_pegs.append('⚪')
                 rows.append(''.join(row_pegs))
-            embed.description = "```\n  ⬇️\n" + "\n".join(rows) + "\n```\ndropping..."
+            embed.description = "```\n  ⬇️\n" + "\n".join(rows) + "\n```\nracing..."
             await message.edit(embed=embed)
 
         await asyncio.sleep(0.5)
@@ -684,13 +686,13 @@ def setup(client: commands.Bot):
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
 
         if net_gain > 0:
-            status = f"landed in {slot_labels[final_slot]} ({multiplier}x)\nyou won {net_gain} {coin_emoji} (balance: {new_balance})"
+            status = f"your horse finished in {slot_labels[final_slot]} ({multiplier}x)\nyou won {net_gain} {coin_emoji} (balance: {new_balance})"
             color = 0xf1c40f if multiplier >= 5 else 0x2ecc71
         elif net_gain == 0:
-            status = f"landed in {slot_labels[final_slot]} ({multiplier}x)\nbroke even (balance: {new_balance})"
+            status = f"your horse finished in {slot_labels[final_slot]} ({multiplier}x)\nbroke even (balance: {new_balance})"
             color = 0x95a5a6
         else:
-            status = f"landed in {slot_labels[final_slot]} ({multiplier}x)\nyou lost {abs(net_gain)} {coin_emoji} (balance: {new_balance})"
+            status = f"your horse finished in {slot_labels[final_slot]} ({multiplier}x)\nyou lost {abs(net_gain)} {coin_emoji} (balance: {new_balance})"
             color = 0xe74c3c
 
         embed.color = color
@@ -699,7 +701,7 @@ def setup(client: commands.Bot):
             row_pegs = []
             for c in range(7):
                 if c == path[r]:
-                    row_pegs.append('🔴')
+                    row_pegs.append('🐎')
                 else:
                     row_pegs.append('⚪')
             rows.append(''.join(row_pegs))
