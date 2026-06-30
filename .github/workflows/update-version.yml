@@ -1,0 +1,39 @@
+name: Update Version File
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      - name: Update version.txt
+        run: |
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          
+          # Write the new version file
+          echo "branch: \`$BRANCH_NAME\`" > version.txt
+          echo "commit: \`$COMMIT_SHA\`" >> version.txt
+          
+          # Check if there are changes
+          if ! git diff --quiet version.txt; then
+            echo "version.txt has changed. Committing..."
+            git config --global user.name "Version Updater Bot"
+            git config --global user.email "version-updater@users.noreply.github.com"
+            git add version.txt
+            git commit -m "build: update version.txt to $COMMIT_SHA [skip ci]"
+            git push
+          else
+            echo "version.txt is already up to date."
+          fi

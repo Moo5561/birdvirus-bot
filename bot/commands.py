@@ -182,11 +182,11 @@ def setup(client: commands.Bot):
     # version
     @client.hybrid_command(name="version", description="show bot version and commit")
     async def version_cmd(ctx: commands.Context):
-        import subprocess
         try:
-            commit = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
-            branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True).strip()
-            await ctx.reply(f"birdvirus bot\nbranch: `{branch}`\ncommit: `{commit}`")
+            with open("version.txt", "r") as f:
+                content = f.read().strip()
+            
+            await ctx.reply(f"birdvirus bot\n{content}")
         except Exception:
             await ctx.reply("birdvirus bot\ncommit: unknown")
 
