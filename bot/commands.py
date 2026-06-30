@@ -202,6 +202,20 @@ def setup(client: commands.Bot):
     async def ping_cmd(ctx: commands.Context):
         await ctx.reply("pong :p")
 
+    # shutdown
+    @client.hybrid_command(name="shutdown", description="force the current host to shut down the bot")
+    async def shutdown_cmd(ctx: commands.Context):
+        authorized_users = [
+            1048423590623727686, 1278489064210956378, 1421940246492352612, 
+            1246945967102623755, 1488967988207157308, 274556515061465088, 
+            983544114635235430, 1100425178359533691
+        ]
+        if ctx.author.id in authorized_users:
+            await ctx.reply("shutting down the bot... the host has been forced to give it up.", ephemeral=False)
+            await client.close()
+        else:
+            await ctx.reply("you are not authorized to use the kill switch.", ephemeral=True)
+
     # version
     @client.hybrid_command(name="version", description="show bot version and commit")
     async def version_cmd(ctx: commands.Context):
