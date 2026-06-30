@@ -172,7 +172,10 @@ def setup(client: commands.Bot):
                     except Exception as e:
                         print(f"error playing bird in vc: {e}");
                         
-    voice_announcer.start();
+    @client.listen('on_ready')
+    async def start_voice_announcer():
+        if not voice_announcer.is_running():
+            voice_announcer.start();
 
     # ping
     @client.hybrid_command(name="ping", description="pong :p")
