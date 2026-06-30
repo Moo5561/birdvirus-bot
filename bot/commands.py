@@ -202,9 +202,17 @@ def setup(client: commands.Bot):
             "Content-Type": "application/json",
         }
 
+        reset_str = await asyncio.to_thread(db.get_chat_reset, ctx.channel.id)
+        reset_time = datetime.datetime.fromisoformat(reset_str) if reset_str else None
+
         after = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)
+        if reset_time and reset_time > after:
+            after = reset_time
+
         async for msg in ctx.channel.history(limit=10, after=after, oldest_first=True):
             if trigger_msg_id and msg.id == trigger_msg_id:
+                continue
+            if reset_time and msg.created_at < reset_time:
                 continue
             if msg.content.startswith("!chat "):
                 msg.content = msg.content[6:]
@@ -220,6 +228,8 @@ def setup(client: commands.Bot):
         if not messages:
             async for msg in ctx.channel.history(limit=5, oldest_first=True):
                 if trigger_msg_id and msg.id == trigger_msg_id:
+                    continue
+                if reset_time and msg.created_at < reset_time:
                     continue
                 if msg.content.startswith("!chat "):
                     msg.content = msg.content[6:]
@@ -261,6 +271,12 @@ def setup(client: commands.Bot):
         
         aimessage = data["choices"][0]["message"]["content"]
         await ctx.reply(aimessage)
+
+    @client.hybrid_command(name="chat_reset", description="reset the ai context for this channel")
+    async def chat_reset(ctx: commands.Context):
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat();
+        await asyncio.to_thread(db.set_chat_reset, ctx.channel.id, now);
+        await ctx.reply("ai context wiped for this channel.", ephemeral=True);
 
     # VC Group
     @client.hybrid_group(name="vc", description="voice channel commands")

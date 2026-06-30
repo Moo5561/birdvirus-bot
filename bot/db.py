@@ -44,8 +44,35 @@ def init_db():
         )
     """)
     
+    # chat resets table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS chat_resets (
+            channel_id INTEGER PRIMARY KEY,
+            reset_at TEXT
+        )
+    """)
+    
     conn.commit()
     conn.close()
+
+# Chat Reset Functions
+def set_chat_reset(channel_id: int, reset_at: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO chat_resets (channel_id, reset_at) VALUES (?, ?) ON CONFLICT(channel_id) DO UPDATE SET reset_at = ?",
+        (channel_id, reset_at, reset_at)
+    )
+    conn.commit()
+    conn.close()
+
+def get_chat_reset(channel_id: int) -> str:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT reset_at FROM chat_resets WHERE channel_id = ?", (channel_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return row[0] if row else None
 
 # Say Logs Functions
 def log_say(user_id: int, user_name: str, message: str):
