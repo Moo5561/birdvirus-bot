@@ -187,7 +187,8 @@ def setup(client: commands.Bot):
             if vc.is_connected():
                 if random.random() < 0.80:
                     try:
-                        queue_audio(vc, "bird.mp3")
+                        audio_file = "birdvirus.mp3" if random.random() < 0.50 else "bird.mp3"
+                        queue_audio(vc, audio_file)
                     except Exception as e:
                         print(f"error queueing bird in vc: {e}");
                         
@@ -341,8 +342,9 @@ def setup(client: commands.Bot):
             return;
             
         try:
-            ctx.voice_client.play(discord.FFmpegPCMAudio("bird.mp3"));
-            await ctx.reply("bird", ephemeral=True);
+            audio_file = "birdvirus.mp3" if random.random() < 0.50 else "bird.mp3"
+            ctx.voice_client.play(discord.FFmpegPCMAudio(audio_file));
+            await ctx.reply(audio_file.replace(".mp3", ""), ephemeral=True);
         except Exception as e:
             await ctx.reply(f"error playing audio: {e}");
 
