@@ -12,7 +12,7 @@ def setup(client: commands.Bot):
 
     @client.event
     async def on_command_error(ctx: commands.Context, error):
-        if isinstance(error, commands.MissingPermissions):
+        if isinstance(error, (commands.MissingPermissions, commands.CheckFailure)):
             await ctx.reply("you don't have permission to do that", ephemeral=True)
         elif isinstance(error, commands.CommandOnCooldown):
             await ctx.reply(f"slow down dude wait {error.retry_after:.1f} seconds", ephemeral=True)

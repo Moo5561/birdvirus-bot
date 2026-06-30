@@ -33,6 +33,23 @@ def calculate_hand(hand):
         aces -= 1
     return value
 
+def is_admin():
+    async def predicate(ctx: commands.Context):
+        admin_ids_str = await asyncio.to_thread(db.get_config, "admin_ids");
+        if admin_ids_str:
+            try:
+                admin_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip()];
+                if ctx.author.id in admin_ids:
+                    return True;
+            except Exception as e:
+                print(f"error parsing admin_ids config: {e}");
+                
+        if ctx.author.guild_permissions.administrator:
+            return True;
+            
+        return False;
+    return commands.check(predicate);
+
 class BlackjackView(discord.ui.View):
     def __init__(self, ctx, bet, player_hand, dealer_hand, coin_emoji):
         super().__init__(timeout=60.0)
@@ -306,12 +323,12 @@ def setup(client: commands.Bot):
 
     # View Group
     @client.hybrid_group(name="view", description="view logs and other data")
-    @commands.has_permissions(administrator=True)
+    @is_admin()
     async def view_group(ctx: commands.Context):
         pass
 
     @view_say_command := view_group.command(name="say", description="see who said what with say")
-    @commands.has_permissions(administrator=True)
+    @is_admin()
     async def view_say(ctx: commands.Context):
         logs = await asyncio.to_thread(db.get_say_logs, 20)
         if not logs:
@@ -335,12 +352,12 @@ def setup(client: commands.Bot):
 
     # Clear Group
     @client.hybrid_group(name="clear", description="clear logs and other data")
-    @commands.has_permissions(administrator=True)
+    @is_admin()
     async def clear_group(ctx: commands.Context):
         pass
 
     @clear_saylist_command := clear_group.command(name="saylist", description="clear the say logs")
-    @commands.has_permissions(administrator=True)
+    @is_admin()
     @app_commands.default_permissions(administrator=True)
     async def clear_saylist(ctx: commands.Context):
         await asyncio.to_thread(db.clear_say_logs)
@@ -352,7 +369,7 @@ def setup(client: commands.Bot):
         pass
 
     @property_register_command := property_group.command(name="register", description="register properties thread channel (admin only)")
-    @commands.has_permissions(administrator=True)
+    @is_admin()
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(channel="the channel where private property threads will be created")
     async def property_register(ctx: commands.Context, channel: discord.TextChannel = None):
@@ -786,12 +803,12 @@ def setup(client: commands.Bot):
 
     # EC Group
     @client.hybrid_group(name="ec", description="economy administration commands")
-    @commands.has_permissions(administrator=True)
+    @is_admin()
     async def ec_group(ctx: commands.Context):
         pass
 
     @ec_emoji_command := ec_group.command(name="emoji", description="set the economy coin emoji (admin only)")
-    @commands.has_permissions(administrator=True)
+    @is_admin()
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(emoji="the emoji representing birdvirus coin")
     async def ec_emoji(ctx: commands.Context, emoji: str):
@@ -799,7 +816,7 @@ def setup(client: commands.Bot):
         await ctx.reply(f"set economy emoji to {emoji}")
 
     @ec_reset_command := ec_group.command(name="reset", description="reset a user's balance to 100 (admin only)")
-    @commands.has_permissions(administrator=True)
+    @is_admin()
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(user="the user whose balance to reset")
     async def ec_reset(ctx: commands.Context, user: discord.Member):
@@ -808,7 +825,7 @@ def setup(client: commands.Bot):
         await ctx.reply(f"reset {user.display_name}s balance to 100 {coin_emoji}")
 
     @ec_set_command := ec_group.command(name="set", description="set a user's balance (admin only)")
-    @commands.has_permissions(administrator=True)
+    @is_admin()
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(user="the user whose balance to set", amount="the new balance amount")
     async def ec_set(ctx: commands.Context, user: discord.Member, amount: int):
