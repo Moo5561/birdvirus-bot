@@ -363,10 +363,29 @@ def setup(client: commands.Bot):
     @vc_group.command(name="leave", description="leave the voice channel")
     async def vc_leave(ctx: commands.Context):
         if ctx.voice_client:
+            guild_id = ctx.guild.id
+            if guild_id in audio_queues:
+                audio_queues[guild_id].clear()
             await ctx.voice_client.disconnect()
             await ctx.reply("left")
         else:
             await ctx.reply("not in a voice channel")
+
+    @vc_group.command(name="stop", description="stop the audio playback and clear the queue")
+    async def vc_stop(ctx: commands.Context):
+        if ctx.voice_client is None:
+            await ctx.reply("i'm not in a voice channel");
+            return;
+            
+        guild_id = ctx.guild.id
+        if guild_id in audio_queues:
+            audio_queues[guild_id].clear();
+            
+        if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
+            ctx.voice_client.stop();
+            await ctx.reply("stopped playback and cleared the queue");
+        else:
+            await ctx.reply("nothing is playing right now");
 
     @vc_group.command(name="bird", description="make the bot say bird in the voice channel")
     async def vc_bird(ctx: commands.Context):
