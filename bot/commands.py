@@ -166,7 +166,7 @@ def setup(client: commands.Bot):
     async def voice_announcer():
         for vc in client.voice_clients:
             if vc.is_connected() and not vc.is_playing():
-                if random.random() < 0.20:
+                if random.random() < 0.80:
                     try:
                         vc.play(discord.FFmpegPCMAudio("bird.mp3"));
                     except Exception as e:
