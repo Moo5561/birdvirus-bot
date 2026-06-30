@@ -815,6 +815,36 @@ def setup(client: commands.Bot):
         else:
             await ctx.reply(f"error: {error}")
 
+    # Fish command
+    @client.hybrid_command(name="fish", description="go fishing to catch some fish and earn coins")
+    @commands.cooldown(1, 45, commands.BucketType.user)
+    async def fish(ctx: commands.Context):
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        
+        fish_types = [
+            {"emoji": "🐟", "name": "common fish", "min": 5, "max": 15, "weight": 60},
+            {"emoji": "🐡", "name": "rare blowfish", "min": 20, "max": 40, "weight": 25},
+            {"emoji": "🦈", "name": "legendary shark", "min": 100, "max": 200, "weight": 5},
+            {"emoji": "👢", "name": "old boot", "min": 0, "max": 0, "weight": 10}
+        ]
+        
+        weights = [f["weight"] for f in fish_types]
+        caught = random.choices(fish_types, weights=weights, k=1)[0]
+        
+        if caught["max"] > 0:
+            amount = random.randint(caught["min"], caught["max"])
+            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, amount)
+            await ctx.reply(f"you cast your line and caught a {caught['emoji']} {caught['name']}! you sold it for {amount} {coin_emoji} (balance: {new_balance})")
+        else:
+            await ctx.reply(f"you cast your line and caught a {caught['emoji']} {caught['name']}. it's worthless. better luck next time.")
+
+    @fish.error
+    async def fish_error(ctx: commands.Context, error):
+        if isinstance(error, commands.CommandOnCooldown):
+            await ctx.reply(f"the fish are scared away. wait {error.retry_after:.1f} seconds to cast again", ephemeral=True)
+        else:
+            await ctx.reply(f"error: {error}")
+
     # Balance command
     @client.hybrid_command(name="balance", description="view coin balance")
     @app_commands.describe(user="the user whose balance you want to check")
