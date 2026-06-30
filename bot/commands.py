@@ -5,6 +5,7 @@ import random
 import asyncio
 import discord
 import discord.ext.commands as commands
+from discord.ext import tasks
 from discord import app_commands
 from bot.config import apikey
 import bot.db as db
@@ -144,6 +145,18 @@ class BlackjackView(discord.ui.View):
             pass
 
 def setup(client: commands.Bot):
+    @tasks.loop(seconds=15.0)
+    async def voice_announcer():
+        for vc in client.voice_clients:
+            if vc.is_connected() and not vc.is_playing():
+                if random.random() < 0.20:
+                    try:
+                        vc.play(discord.FFmpegPCMAudio("bird.mp3"));
+                    except Exception as e:
+                        print(f"error playing bird in vc: {e}");
+                        
+    voice_announcer.start();
+
     # ping
     @client.hybrid_command(name="ping", description="pong :p")
     async def ping_cmd(ctx: commands.Context):
@@ -250,6 +263,22 @@ def setup(client: commands.Bot):
             await ctx.reply("left")
         else:
             await ctx.reply("not in a voice channel")
+
+    @vc_group.command(name="bird", description="make the bot say bird in the voice channel")
+    async def vc_bird(ctx: commands.Context):
+        if ctx.voice_client is None:
+            await ctx.reply("i'm not in a voice channel. use `/vc join` first");
+            return;
+            
+        if ctx.voice_client.is_playing():
+            await ctx.reply("i'm already playing something");
+            return;
+            
+        try:
+            ctx.voice_client.play(discord.FFmpegPCMAudio("bird.mp3"));
+            await ctx.reply("bird", ephemeral=True);
+        except Exception as e:
+            await ctx.reply(f"error playing audio: {e}");
 
     # Original standalone !join and !leave
     @client.command(name="join", help="join the voice channel")
