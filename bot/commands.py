@@ -179,6 +179,17 @@ def setup(client: commands.Bot):
     async def ping_cmd(ctx: commands.Context):
         await ctx.reply("pong :p")
 
+    # version
+    @client.hybrid_command(name="version", description="show bot version and commit")
+    async def version_cmd(ctx: commands.Context):
+        import subprocess
+        try:
+            commit = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
+            branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True).strip()
+            await ctx.reply(f"birdvirus bot\nbranch: `{branch}`\ncommit: `{commit}`")
+        except Exception:
+            await ctx.reply("birdvirus bot\ncommit: unknown")
+
     # chat
     @client.hybrid_command(name="chat", description="chat with the birdvirus bot")
     @app_commands.describe(message="what you want to say")
