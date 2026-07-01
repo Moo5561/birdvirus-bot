@@ -170,6 +170,7 @@ class BlackjackView(discord.ui.View):
             pass
 
 audio_queues = {}
+voice_joiners = {}
 
 def setup(client: commands.Bot):
     def play_next(error, vc, guild_id):
@@ -387,14 +388,43 @@ def setup(client: commands.Bot):
             await ctx.voice_client.move_to(channel)
         else:
             await channel.connect()
+            
+        voice_joiners[ctx.guild.id] = ctx.author.id
         await ctx.reply("joined")
 
     @vc_group.command(name="leave", description="leave the voice channel")
     async def vc_leave(ctx: commands.Context):
+        guild_id = ctx.guild.id
+        joiner_id = voice_joiners.get(guild_id)
+        
+        is_authorized = False
+        if joiner_id is None:
+            is_authorized = True
+        elif ctx.author.id == joiner_id:
+            is_authorized = True
+        else:
+            AUTHORIZED_USERS = [
+                1048423590623727686, 1278489064210956378, 1421940246492352612, 
+                1246945967102623755, 1488967988207157308, 274556515061465088, 
+                983544114635235430, 1100425178359533691
+            ]
+            if ctx.author.id in AUTHORIZED_USERS or ctx.author.guild_permissions.administrator:
+                is_authorized = True
+                
+        if not is_authorized:
+            try:
+                joiner = await ctx.guild.fetch_member(joiner_id)
+                joiner_name = joiner.display_name
+            except:
+                joiner_name = f"user <@{joiner_id}>"
+            await ctx.reply(f"only {joiner_name} (who ran `/vc join`) can disconnect the bot", ephemeral=True)
+            return
+
         if ctx.voice_client:
-            guild_id = ctx.guild.id
             if guild_id in audio_queues:
                 audio_queues[guild_id].clear()
+            if guild_id in voice_joiners:
+                del voice_joiners[guild_id]
             await ctx.voice_client.disconnect()
             await ctx.reply("left")
         else:
