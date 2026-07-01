@@ -97,7 +97,7 @@ def setup_utility(client: commands.Bot):
                 messages.append({"role": "user", "content": f"{msg.author.display_name}: {msg.content}"})
 
         if message:
-            messages.append({"role": "user", "content": f"{ctx.author.display_name}: {message}"})
+            messages.append({"role": "user", "content": f"CURRENT MESSAGE (FOCUS MAINLY ON THIS): {ctx.author.display_name}: {message}"})
 
         if not messages:
             async for msg in ctx.channel.history(limit=5, oldest_first=True):
