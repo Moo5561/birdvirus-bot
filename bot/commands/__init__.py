@@ -1,9 +1,41 @@
 import asyncio
+import discord
 import discord.ext.commands as commands
 import bot.db as db
 
 audio_queues = {}
 voice_joiners = {}
+
+# Global DM fallback monkeypatch
+_original_send = commands.Context.send
+_original_reply = commands.Context.reply
+
+async def safe_send(self, *args, **kwargs):
+    try:
+        return await _original_send(self, *args, **kwargs)
+    except discord.Forbidden:
+        try:
+            dm_channel = self.author.dm_channel or await self.author.create_dm()
+            kwargs.pop("reference", None)
+            kwargs.pop("mention_author", None)
+            return await dm_channel.send(*args, **kwargs)
+        except Exception as e:
+            print(f"failed to send DM fallback: {e}")
+
+async def safe_reply(self, *args, **kwargs):
+    try:
+        return await _original_reply(self, *args, **kwargs)
+    except discord.Forbidden:
+        try:
+            dm_channel = self.author.dm_channel or await self.author.create_dm()
+            kwargs.pop("reference", None)
+            kwargs.pop("mention_author", None)
+            return await dm_channel.send(*args, **kwargs)
+        except Exception as e:
+            print(f"failed to send DM fallback: {e}")
+
+commands.Context.send = safe_send
+commands.Context.reply = safe_reply
 
 def is_admin():
     async def predicate(ctx: commands.Context):
