@@ -15,8 +15,9 @@ This repository contains the source code for the birdvirus Discord bot, designed
 
 - `main.py`: Pure orchestration (entry point, configures the client, loads modules, and starts the bot).
 - `bot/config.py`: Environment configuration and setup of Discord client intents.
-- `bot/commands.py`: Command implementations (e.g., ping, chat, join, leave).
-- `bot/events.py`: Event handlers (e.g., on_ready).
+- `bot/commands/`: Modular command sub-packages (including voice, economy, blackjack, admin, and utility commands).
+- `bot/events.py`: Event handlers (e.g., on_ready, on_message, on_command_error).
+- `archived/`: Preserved copy of the original monolith `commands.py` file for backup.
 
 ## Features
 
