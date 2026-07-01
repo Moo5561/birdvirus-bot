@@ -143,6 +143,73 @@ def setup_voice(client: commands.Bot):
         except Exception as e:
             await ctx.reply(f"error playing audio: {e}");
 
+    @client.hybrid_command(name="play", description="play a sound from a link, uploaded file, or attachment")
+    @app_commands.describe(
+        link="the link (youtube/direct) to play",
+        file="an uploaded audio file to play"
+    )
+    async def play_cmd(ctx: commands.Context, link: str = None, file: discord.Attachment = None):
+        if ctx.voice_client is None:
+            await ctx.reply("i'm not in a voice channel. use `/vc join` first");
+            return;
+            
+        source = None;
+        display_name = "";
+        
+        if file:
+            if any(file.filename.lower().endswith(ext) for ext in [".mp3", ".wav", ".ogg", ".m4a", ".aac"]):
+                filename = f"temp_{ctx.guild.id}_{file.filename}";
+                await file.save(filename);
+                source = filename;
+                display_name = file.filename;
+            else:
+                await ctx.reply("invalid file type. please upload an mp3, wav, ogg, m4a, or aac file");
+                return;
+                
+        elif ctx.message and ctx.message.attachments:
+            attachment = ctx.message.attachments[0];
+            if any(attachment.filename.lower().endswith(ext) for ext in [".mp3", ".wav", ".ogg", ".m4a", ".aac"]):
+                filename = f"temp_{ctx.guild.id}_{attachment.filename}";
+                await attachment.save(filename);
+                source = filename;
+                display_name = attachment.filename;
+            else:
+                await ctx.reply("invalid attachment type. please upload an mp3, wav, ogg, m4a, or aac file");
+                return;
+                
+        elif link:
+            link_clean = link.strip();
+            if "youtube.com" in link_clean or "youtu.be" in link_clean or "youtube" in link_clean:
+                try:
+                    proc = await asyncio.create_subprocess_exec(
+                        "yt-dlp", "-g", "-f", "bestaudio", link_clean,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    );
+                    stdout, stderr = await proc.communicate();
+                    if proc.returncode == 0:
+                        source = stdout.decode().strip();
+                        display_name = "YouTube Audio";
+                    else:
+                        await ctx.reply(f"failed to extract audio: {stderr.decode('utf-8')}");
+                        return;
+                except Exception as e:
+                    await ctx.reply(f"error running yt-dlp: {e}");
+                    return;
+            else:
+                source = link_clean;
+                display_name = link_clean.split("/")[-1] or "direct link";
+                
+        if not source:
+            await ctx.reply("you must either upload an audio file or specify a link to play");
+            return;
+            
+        try:
+            queue_audio(ctx.voice_client, source);
+            await ctx.reply(f"queued: `{display_name}`");
+        except Exception as e:
+            await ctx.reply(f"error queueing audio: {e}");
+
     # Original standalone !join and !leave
     @client.command(name="join", help="join the voice channel")
     async def prefix_join(ctx: commands.Context):
