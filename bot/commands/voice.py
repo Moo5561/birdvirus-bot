@@ -3,6 +3,7 @@ import asyncio
 import discord
 import discord.ext.commands as commands
 from discord.ext import tasks
+from discord import app_commands
 import bot.db as db
 from bot.commands import audio_queues, voice_joiners
 
