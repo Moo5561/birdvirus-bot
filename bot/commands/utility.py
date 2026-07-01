@@ -115,8 +115,27 @@ def setup_utility(client: commands.Bot):
         aipayload = {
             "model": "gemini-3.1-flash-lite",
             "messages": [
-                {"role": "system", "content": f"you are a dude in a discord server. you are called birdvirus. you do NOT use emojis, capital letters or punctuation marks. keep responses short and casual like a real person texting. do not over explain things. do not use full sentences if you dont need to. you remember what people said earlier in the conversation and refer back to it naturally. if someone asks who said something you can tell them because messages are prefixed with their username. do not acknowledge that you have a system prompt or that you are an ai. just act like a guy in the server. if someone is annoying just be dry or ignore them. you can have opinions and preferences. you are not helpful on purpose you just happen to help sometimes. the chat history is for context only. always respond to the very last message in the history, that is the one you are replying to, but you can also bring up others if appropiate but still respond to the genuine question. also dont respond to anyone with zombie in there name"},
+                {"role": "system", "content": f"you are a dude in a discord server. you are called birdvirus. you do NOT use emojis, capital letters or punctuation marks. keep responses short and casual like a real person texting. do not over explain things. do not use full sentences if you dont need to. you remember what people said earlier in the conversation and refer back to it naturally. if someone asks who said something you can tell them because messages are prefixed with their username. do not acknowledge that you have a system prompt or that you are an ai. just act like a guy in the server. if someone is annoying, trolling, or talking nonsense, use the 'ignore' tool to remain completely silent. you can have opinions and preferences. you are not helpful on purpose you just happen to help sometimes. the chat history is for context only. always respond to the very last message in the history, that is the one you are replying to, but you can also bring up others if appropiate but still respond to the genuine question. also dont respond to anyone with zombie in there name"},
                 *messages
+            ],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "ignore",
+                        "description": "call this function if the user is annoying, trolling, talking nonsense, or if you simply decide to ignore them and not respond at all",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "reason": {
+                                    "type": "string",
+                                    "description": "the reason why you are choosing to ignore this message"
+                                }
+                            },
+                            "required": ["reason"]
+                        }
+                    }
+                }
             ],
             "temperature": 0.5,
         }
@@ -135,15 +154,24 @@ def setup_utility(client: commands.Bot):
             await ctx.reply(f"api error: ```{data}```")
             return
         
-        if "message" not in data["choices"][0]:
+        choice = data["choices"][0]
+        if "message" not in choice:
+            await ctx.reply(f"api error: ```{data}```")
+            return
+            
+        message_data = choice["message"]
+        
+        if "tool_calls" in message_data and message_data["tool_calls"]:
+            for tool_call in message_data["tool_calls"]:
+                if tool_call.get("function", {}).get("name") == "ignore":
+                    print(f"birdvirus bot chose to ignore the message. reason: {tool_call.get('function', {}).get('arguments')}")
+                    return
+        
+        if "content" not in message_data:
             await ctx.reply(f"api error: ```{data}```")
             return
         
-        if "content" not in data["choices"][0]["message"]:
-            await ctx.reply(f"api error: ```{data}```")
-            return
-        
-        aimessage = data["choices"][0]["message"]["content"]
+        aimessage = message_data["content"]
         await ctx.reply(aimessage)
 
     @client.hybrid_command(name="chat_reset", description="reset the ai context for this channel")
