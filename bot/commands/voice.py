@@ -12,15 +12,17 @@ def play_next(error, vc, guild_id):
         
     if guild_id in audio_queues and len(audio_queues[guild_id]) > 0:
         source = audio_queues[guild_id].pop(0)
-        vol = 0.60
-        audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(source), volume=vol)
+        vol = 1.0 if "badapple_max" in source else 0.60
+        actual_source = "badapple.mp3" if "badapple" in source else source
+        audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(actual_source), volume=vol)
         vc.play(audio_source, after=lambda e: play_next(e, vc, guild_id))
 
 def queue_audio(vc, source):
     guild_id = vc.guild.id
     if not vc.is_playing():
-        vol = 0.60
-        audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(source), volume=vol)
+        vol = 1.0 if "badapple_max" in source else 0.60
+        actual_source = "badapple.mp3" if "badapple" in source else source
+        audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(actual_source), volume=vol)
         vc.play(audio_source, after=lambda e: play_next(e, vc, guild_id))
     else:
         if guild_id not in audio_queues:
@@ -154,23 +156,25 @@ def setup_voice(client: commands.Bot):
     async def bad_group(ctx: commands.Context):
         pass
 
-    @bad_apple_command := bad_group.command(name="apple", description="play bad apple audio in voice channel (costs 60 coins)")
-    async def bad_apple(ctx: commands.Context):
+    @bad_apple_command := bad_group.command(name="apple", description="play bad apple audio in voice channel")
+    @app_commands.describe(max_volume="play at 100% volume for 1000 coins instead of 60% for 60 coins")
+    async def bad_apple(ctx: commands.Context, max_volume: bool = False):
         if ctx.voice_client is None:
             await ctx.reply("i'm not in a voice channel. use `/vc join` first");
             return;
             
-        cost = 60;
+        cost = 1000 if max_volume else 60;
         balance = await asyncio.to_thread(db.get_balance, ctx.author.id);
         if balance < cost:
             coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙");
-            await ctx.reply(f"you don't have enough coins. bad apple costs {cost} {coin_emoji} (your balance: {balance})");
+            await ctx.reply(f"you don't have enough coins. this costs {cost} {coin_emoji} (your balance: {balance})");
             return;
             
         try:
-            queue_audio(ctx.voice_client, "badapple.mp3");
+            source_file = "badapple_max.mp3" if max_volume else "badapple.mp3";
+            queue_audio(ctx.voice_client, source_file);
             new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, -cost);
             coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙");
-            await ctx.reply(f"queued bad apple 🍎. deducted {cost} {coin_emoji} (balance: {new_balance})");
+            await ctx.reply(f"queued bad apple 🍎 ({'100%' if max_volume else '60%'} volume). deducted {cost} {coin_emoji} (balance: {new_balance})");
         except Exception as e:
             await ctx.reply(f"error playing audio: {e}");
