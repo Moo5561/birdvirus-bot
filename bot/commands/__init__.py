@@ -67,10 +67,12 @@ from .voice import setup_voice
 from .economy import setup_economy
 from .admin import setup_admin
 from .utility import setup_utility
+from .horserace import setup_horserace
 
 def setup(client: commands.Bot):
     setup_blackjack(client)
     setup_voice(client)
     setup_economy(client)
+    setup_horserace(client)
     setup_admin(client)
     setup_utility(client)

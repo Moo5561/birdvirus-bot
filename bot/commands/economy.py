@@ -6,6 +6,7 @@ from discord import app_commands
 import bot.db as db
 from bot.commands import is_admin
 from bot.commands.blackjack import BlackjackView, draw_card
+from bot.commands.horserace import HorseRaceView
 
 async def get_balance_checked(ctx, user_id):
     if ctx.bot.user and ctx.bot.user.id == 1522117141090799697:
@@ -349,6 +350,22 @@ def setup_economy(client: commands.Bot):
             rows.append(''.join(row_pegs))
         embed.description = "```\n  ⬇️\n" + "\n".join(rows) + f"\n{slots_row}\n{mults_row}\n```\n{status.lower()}"
         await message.edit(embed=embed)
+
+    @pure_horse_command := pure_group.command(name="horse", description="bet on a horse race at the birdvirus track")
+    @app_commands.describe(bet="the amount of coins to bet")
+    async def pure_horse(ctx: commands.Context, bet: int):
+        if bet <= 0:
+            await ctx.reply("bet must be greater than zero")
+            return
+
+        bal, _ = await get_balance_checked(ctx, ctx.author.id)
+        if bal < bet and ctx.bot.user.id != 1522117141090799697:
+            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
+            return
+
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        view = HorseRaceView(ctx, bet, coin_emoji)
+        await view.start(ctx)
 
     # Beg command
     @client.hybrid_command(name="beg", description="beg for some coins with low risk")
