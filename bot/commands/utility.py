@@ -304,20 +304,28 @@ def setup_utility(client: commands.Bot):
     async def tts_cmd(ctx: commands.Context, *, text: str):
         await ctx.reply(f"generating tts for: '{text}'...")
         try:
-            client_g4f = Client()
+            from g4f.client import AsyncClient
+            import urllib.parse
+            import shutil
             
-            def generate_tts():
-                return client_g4f.media.generate(
-                    text,
-                    model="gpt-4o-mini-tts",
-                    audio={"voice": "coral"}
-                )
-                
-            response = await asyncio.to_thread(generate_tts)
+            client_g4f = AsyncClient()
+            os.makedirs("generated_media", exist_ok=True)
+            response = await client_g4f.media.generate(
+                text,
+                model="gpt-4o-mini-tts",
+                audio={"voice": "coral"}
+            )
             
             os.makedirs("mp3", exist_ok=True)
             filename = f"mp3/tts_{ctx.guild.id}_{ctx.author.id}.mp3"
-            response.data[0].save(filename)
+            
+            # g4f returns a url like /media/file%2Bname.mp3 but saves it in ./generated_media/file+name.mp3
+            # their built-in .save() method is broken on windows because of the leading slash
+            item_url = response.data[0].url
+            raw_filename = urllib.parse.unquote(os.path.basename(item_url))
+            source_path = os.path.join("generated_media", raw_filename)
+            
+            shutil.copy(source_path, filename)
             
             if ctx.voice_client is None:
                 await ctx.reply(file=discord.File(filename))
