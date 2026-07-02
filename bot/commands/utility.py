@@ -10,6 +10,7 @@ from discord import app_commands
 from bot.config import apikey
 import bot.db as db
 from playwright.async_api import async_playwright
+from g4f.client import Client
 
 def setup_utility(client: commands.Bot):
     # ping
