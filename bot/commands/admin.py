@@ -186,6 +186,8 @@ def setup_admin(client: commands.Bot):
              
         if role in member.roles:
             await member.remove_roles(role)
+            if member.voice and member.voice.channel == channel:
+                await member.move_to(None)
             await ctx.reply(f"kicked {member.mention} from {channel.name}")
         else:
             await ctx.reply(f"{member.display_name} is not in this property")
