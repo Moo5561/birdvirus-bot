@@ -191,4 +191,26 @@ def add_property(thread_id: int, owner_id: int, name: str):
     conn.commit()
     conn.close()
 
+def get_property(thread_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT owner_id, name FROM properties WHERE thread_id = ?", (thread_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
+def update_property_owner(thread_id: int, new_owner_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE properties SET owner_id = ? WHERE thread_id = ?", (new_owner_id, thread_id))
+    conn.commit()
+    conn.close()
+
+def update_property_name(thread_id: int, new_name: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE properties SET name = ? WHERE thread_id = ?", (new_name, thread_id))
+    conn.commit()
+    conn.close()
+
 init_db()
