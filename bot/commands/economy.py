@@ -9,7 +9,7 @@ from bot.commands.blackjack import BlackjackView, draw_card
 
 async def get_balance_checked(ctx, user_id):
     if ctx.bot.user and ctx.bot.user.id == 1522117141090799697:
-        return 999999999999, 999999999999
+        return 999999999999999999999999999, 999999999999999999999999999
     return await asyncio.to_thread(db.get_balances, user_id)
 
 def setup_economy(client: commands.Bot):
