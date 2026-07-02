@@ -155,6 +155,22 @@ def setup_voice(client: commands.Bot):
         except Exception as e:
             await ctx.reply(f"error queueing audio: {e}");
 
+    @client.hybrid_command(name="stop", description="stop the audio playback and clear the queue")
+    async def stop_cmd(ctx: commands.Context):
+        if ctx.voice_client is None:
+            await ctx.reply("i'm not in a voice channel")
+            return
+
+        guild_id = ctx.guild.id
+        if guild_id in audio_queues:
+            audio_queues[guild_id].clear()
+
+        if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
+            ctx.voice_client.stop()
+            await ctx.reply("stopped playback and cleared the queue")
+        else:
+            await ctx.reply("nothing is playing right now")
+
     @client.hybrid_command(name="play", description="play a sound from a link, uploaded file, or attachment")
     @app_commands.describe(
         link="the link (youtube/direct) to play",
