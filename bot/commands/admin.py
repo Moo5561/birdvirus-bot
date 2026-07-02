@@ -103,14 +103,20 @@ def setup_admin(client: commands.Bot):
             role = await ctx.guild.create_role(name=role_name, reason="property purchase")
             await ctx.author.add_roles(role)
             
+            # create category
+            category = discord.utils.get(ctx.guild.categories, name="vc-properties")
+            if not category:
+                category = await ctx.guild.create_category("vc-properties")
+            
             # create vc
             overwrites = {
                 ctx.guild.default_role: discord.PermissionOverwrite(connect=False),
                 role: discord.PermissionOverwrite(connect=True, view_channel=True),
                 ctx.guild.me: discord.PermissionOverwrite(connect=True, view_channel=True)
             }
-            vc = await ctx.guild.create_voice_channel(name=name or f"{ctx.author.display_name}'s-vc", overwrites=overwrites)
+            vc = await ctx.guild.create_voice_channel(name=name or f"{ctx.author.display_name}'s-vc", category=category, overwrites=overwrites)
             
+            await asyncio.to_thread(db.add_property, vc.id, ctx.author.id, "vc")
             await ctx.reply(f"you bought a VC property {vc.mention}! role {role.mention} added. balance: {new_balance}")
             return
 
@@ -153,6 +159,16 @@ def setup_admin(client: commands.Bot):
         except Exception as e:
             await asyncio.to_thread(db.update_balance, ctx.author.id, cost)
             await ctx.reply(f"failed to create thread: {e}")
+
+    @property_group.command(name="remove", description="remove a property (admin only)")
+    @is_admin()
+    async def property_remove(ctx: commands.Context, channel: discord.VoiceChannel = None):
+        if not channel:
+            await ctx.reply("please mention the voice channel to remove")
+            return
+            
+        await channel.delete()
+        await ctx.reply(f"removed property {channel.name}")
 
     # EC Group
     @client.hybrid_group(name="ec", description="economy administration commands")
