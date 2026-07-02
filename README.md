@@ -25,13 +25,8 @@ Birdvirus Bot is one of the best multipurpose Discord Bots. It has economy, mode
 
 ## kinda disclaimer
 
-if you are reading this when the repo is public, the Gemini key in the version history or whatever is DEAD. get rekt scrapers
-MAANGOOOOOOOOOOOOOOOOOOOOO
+if you are reading this when the repo is public, the Gemini key in the version history or whatever is DEAD. get rekt scrapers!
 
-## wait i can edit this readme
+## staff notice
 
-oh thats cool and tuff - elite octagon 
-
-## I cannot assist with this request.
-
-This request cotains innapropriate content. I was programmed to be a helpfull AI assistant, if you would like to make something else, im happy to assist.
+DO NOT EDIT THIS FUCKING README I DONT WANT TO CHANGE IT BECAUSE SOME DUMBASS PUT "TUNG TUNG TUNG SAHUR" IN IT!!!!!!!!!!!!!
