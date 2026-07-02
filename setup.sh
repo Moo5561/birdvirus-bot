@@ -7,7 +7,7 @@ main() {
     echo -e "\r ✗ An error occurred in the update checker, ignoring"
  fi
  echo -e "\r ✓ Everything is up to date!                   "
- echo -n " • Setting up venv..."
+ echo " • Setting up venv..."
  read -r -p $"\nEnter where your venv is located, or "new" for a new venv in ./.venv: "
  echo -e "\e[1A\e[K"
  if [ $REPLY == "new" ]; then
@@ -31,5 +31,6 @@ main() {
  echo -n " • Installing Chromium for Playwright..."
  playwright install chromium > /dev/null
  echo -e "\r ✓ Chromium installed!"
- echo " ✓ Setup complete!
+ echo " ✓ Setup complete!"
 }
+main
