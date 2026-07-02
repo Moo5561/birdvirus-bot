@@ -3,3 +3,4 @@ python-dotenv
 aiohttp
 playwright
 PyNaCl
+g4f

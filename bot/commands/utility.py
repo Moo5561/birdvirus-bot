@@ -295,3 +295,27 @@ def setup_utility(client: commands.Bot):
                 f"it tasted like sulfur and pain. you blew up and lost {cost + abs(loss)} coins (balance: {new_balance})"
             ]
             await ctx.reply(random.choice(responses))
+
+    # tts
+    @client.hybrid_command(name="tts", description="convert text to speech")
+    @app_commands.describe(text="text to say")
+    async def tts_cmd(ctx: commands.Context, *, text: str):
+        if ctx.voice_client is None:
+            await ctx.reply("i'm not in a voice channel. use `/vc join` first")
+            return
+
+        await ctx.reply(f"generating tts for: '{text}'...")
+        try:
+            client_g4f = Client()
+            response = client_g4f.media.generate(
+                text,
+                model="gpt-4o-mini-tts",
+                audio={"voice": "coral"}
+            )
+            filename = f"mp3/tts_{ctx.guild.id}_{ctx.author.id}.mp3"
+            response.data[0].save(filename)
+            from bot.commands.voice import queue_audio
+            queue_audio(ctx.voice_client, filename)
+            await ctx.reply(f"queued tts 🗣️")
+        except Exception as e:
+            await ctx.reply(f"error generating tts: {e}")
