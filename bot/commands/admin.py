@@ -64,15 +64,30 @@ def setup_admin(client: commands.Bot):
         await ctx.reply(f"registered {target_channel.mention} for properties")
 
     @property_buy_command := property_group.command(name="buy", description="buy a private property (costs 50 coins)")
-    @app_commands.describe(
-        name="desired name for your property",
-        type="type of property: thread (old) or vc (new private vc + role)"
-    )
-    @app_commands.choices(type=[
-        app_commands.Choice(name="thread", value="thread"),
-        app_commands.Choice(name="vc", value="vc")
-    ])
     async def property_buy(ctx: commands.Context, name: str = None, type: str = "thread"):
+        # this is just a quick fix since hybrid commands are tricky with custom arguments
+        # especially with spaces in names.
+        
+        args = ctx.message.content.split()
+        # manual parsing if prefix command
+        if not ctx.interaction:
+            # simple parser for --name "..." --type ...
+            # this is hacky but we are in a hurry
+            import argparse
+            class ArgumentParser(argparse.ArgumentParser):
+                def error(self, message): pass
+            
+            parser = ArgumentParser()
+            parser.add_argument("--name")
+            parser.add_argument("--type")
+            
+            # split by -- to separate
+            parts = ctx.message.content.split("--")
+            parsed_args, _ = parser.parse_known_args(parts)
+            
+            name = parsed_args.name if parsed_args.name else name
+            type = parsed_args.type if parsed_args.type else type
+
         if type == "vc":
             # vc logic
             cost = 100 # lets set a price
