@@ -304,11 +304,15 @@ def setup_utility(client: commands.Bot):
         await ctx.reply(f"generating tts for: '{text}'...")
         try:
             client_g4f = Client()
-            response = client_g4f.media.generate(
-                text,
-                model="gpt-4o-mini-tts",
-                audio={"voice": "coral"}
-            )
+            
+            def generate_tts():
+                return client_g4f.media.generate(
+                    text,
+                    model="gpt-4o-mini-tts",
+                    audio={"voice": "coral"}
+                )
+                
+            response = await asyncio.to_thread(generate_tts)
             filename = f"mp3/tts_{ctx.guild.id}_{ctx.author.id}.mp3"
             response.data[0].save(filename)
             
