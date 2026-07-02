@@ -24,7 +24,7 @@ def setup(client: commands.Bot):
                     try:
                         from bot.commands import audio_queues
                         guild_id = vc.guild.id
-                        source = "birdvirus.mp3" if random.random() < 0.50 else "bird.mp3"
+                        source = "mp3/birdvirus.mp3" if random.random() < 0.50 else "mp3/bird.mp3"
                         
                         if not vc.is_playing():
                             def play_next(error, vc_ref, g_id):

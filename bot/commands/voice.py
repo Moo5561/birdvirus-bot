@@ -14,7 +14,7 @@ def play_next(error, vc, guild_id):
     if guild_id in audio_queues and len(audio_queues[guild_id]) > 0:
         source = audio_queues[guild_id].pop(0)
         vol = 1.0 if "badapple_max" in source else 0.60
-        actual_source = "badapple.mp3" if "badapple" in source else source
+        actual_source = f"mp3/{source}"
         audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(actual_source), volume=vol)
         vc.play(audio_source, after=lambda e: play_next(e, vc, guild_id))
 
@@ -22,7 +22,7 @@ def queue_audio(vc, source):
     guild_id = vc.guild.id
     if not vc.is_playing():
         vol = 1.0 if "badapple_max" in source else 0.60
-        actual_source = "badapple.mp3" if "badapple" in source else source
+        actual_source = f"mp3/{source}"
         audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(actual_source), volume=vol)
         vc.play(audio_source, after=lambda e: play_next(e, vc, guild_id))
     else:
@@ -169,7 +169,7 @@ def setup_voice(client: commands.Bot):
         elif ctx.message and ctx.message.attachments:
             attachment = ctx.message.attachments[0];
             if any(attachment.filename.lower().endswith(ext) for ext in [".mp3", ".wav", ".ogg", ".m4a", ".aac"]):
-                filename = f"temp_{ctx.guild.id}_{attachment.filename}";
+                filename = f"mp3/temp_{ctx.guild.id}_{attachment.filename}";
                 await attachment.save(filename);
                 source = filename;
                 display_name = attachment.filename;
