@@ -4,6 +4,7 @@ import datetime
 import random
 import sys
 import asyncio
+import os
 import discord
 import discord.ext.commands as commands
 from discord import app_commands
@@ -313,6 +314,8 @@ def setup_utility(client: commands.Bot):
                 )
                 
             response = await asyncio.to_thread(generate_tts)
+            
+            os.makedirs("mp3", exist_ok=True)
             filename = f"mp3/tts_{ctx.guild.id}_{ctx.author.id}.mp3"
             response.data[0].save(filename)
             
