@@ -170,8 +170,8 @@ def setup_admin(client: commands.Bot):
         await channel.delete()
         await ctx.reply(f"removed property {channel.name}")
 
-    @property_group.command(name="invite", description="invite someone to your vc property")
-    async def property_invite(ctx: commands.Context, member: discord.Member, channel: discord.VoiceChannel = None):
+    @property_group.command(name="kick", description="kick someone from your vc property")
+    async def property_kick(ctx: commands.Context, member: discord.Member, channel: discord.VoiceChannel = None):
         channel = channel or (ctx.author.voice.channel if ctx.author.voice else None)
         if not channel:
             await ctx.reply("please mention a voice channel or join one")
@@ -184,8 +184,11 @@ def setup_admin(client: commands.Bot):
              await ctx.reply("you don't own this property")
              return
              
-        await member.add_roles(role)
-        await ctx.reply(f"invited {member.mention} to {channel.name}")
+        if role in member.roles:
+            await member.remove_roles(role)
+            await ctx.reply(f"kicked {member.mention} from {channel.name}")
+        else:
+            await ctx.reply(f"{member.display_name} is not in this property")
 
     # EC Group
     @client.hybrid_group(name="ec", description="economy administration commands")
