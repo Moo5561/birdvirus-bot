@@ -63,9 +63,43 @@ def setup_admin(client: commands.Bot):
         await asyncio.to_thread(db.set_config, "property_channel_id", str(target_channel.id))
         await ctx.reply(f"registered {target_channel.mention} for properties")
 
-    @property_buy_command := property_group.command(name="buy", description="buy a private property thread (costs 50 coins)")
-    @app_commands.describe(name="desired name for your private thread")
-    async def property_buy(ctx: commands.Context, name: str = None):
+    @property_buy_command := property_group.command(name="buy", description="buy a private property (costs 50 coins)")
+    @app_commands.describe(
+        name="desired name for your property",
+        type="type of property: thread (old) or vc (new private vc + role)"
+    )
+    @app_commands.choices(type=[
+        app_commands.Choice(name="thread", value="thread"),
+        app_commands.Choice(name="vc", value="vc")
+    ])
+    async def property_buy(ctx: commands.Context, name: str = None, type: str = "thread"):
+        if type == "vc":
+            # vc logic
+            cost = 100 # lets set a price
+            balance = await asyncio.to_thread(db.get_balance, ctx.author.id)
+            if balance < cost:
+                await ctx.reply(f"you don't have enough coins. a vc property costs {cost} coins (your balance: {balance})")
+                return
+
+            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, -cost)
+            
+            # create role
+            role_name = f"{ctx.author.display_name}'s property"
+            role = await ctx.guild.create_role(name=role_name, reason="property purchase")
+            await ctx.author.add_roles(role)
+            
+            # create vc
+            overwrites = {
+                ctx.guild.default_role: discord.PermissionOverwrite(connect=False),
+                role: discord.PermissionOverwrite(connect=True, view_channel=True),
+                ctx.guild.me: discord.PermissionOverwrite(connect=True, view_channel=True)
+            }
+            vc = await ctx.guild.create_voice_channel(name=name or f"{ctx.author.display_name}'s-vc", overwrites=overwrites)
+            
+            await ctx.reply(f"you bought a VC property {vc.mention}! role {role.mention} added. balance: {new_balance}")
+            return
+
+        # thread logic (the old way)
         channel_id_str = await asyncio.to_thread(db.get_config, "property_channel_id")
         if not channel_id_str:
             await ctx.reply("properties channel has not been registered yet. an admin needs to run `/property register` first")
