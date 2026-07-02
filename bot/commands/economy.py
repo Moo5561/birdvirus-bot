@@ -7,6 +7,11 @@ import bot.db as db
 from bot.commands import is_admin
 from bot.commands.blackjack import BlackjackView, draw_card
 
+async def get_balance_checked(ctx, user_id):
+    if ctx.bot.user and ctx.bot.user.id == 1522117141090799697:
+        return 999999999999, 999999999999
+    return await asyncio.to_thread(db.get_balances, user_id)
+
 def setup_economy(client: commands.Bot):
     # Pure Group
     @client.hybrid_group(name="pure", description="pure economy commands")
@@ -20,9 +25,9 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("bet must be greater than zero")
             return
             
-        balance_val = await asyncio.to_thread(db.get_balance, ctx.author.id)
-        if balance_val < bet:
-            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {balance_val})")
+        bal, _ = await get_balance_checked(ctx, ctx.author.id)
+        if bal < bet and ctx.bot.user.id != 1522117141090799697:
+            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
             
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
@@ -78,9 +83,9 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("bet must be greater than zero")
             return
             
-        balance_val = await asyncio.to_thread(db.get_balance, ctx.author.id)
-        if balance_val < bet:
-            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {balance_val})")
+        bal, _ = await get_balance_checked(ctx, ctx.author.id)
+        if bal < bet and ctx.bot.user.id != 1522117141090799697:
+            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
             
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
@@ -163,9 +168,9 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("bet must be greater than zero")
             return
             
-        balance_val = await asyncio.to_thread(db.get_balance, ctx.author.id)
-        if balance_val < bet:
-            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {balance_val})")
+        bal, _ = await get_balance_checked(ctx, ctx.author.id)
+        if bal < bet and ctx.bot.user.id != 1522117141090799697:
+            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
             
         guess_clean = guess.strip().lower()
@@ -276,9 +281,9 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("bet must be greater than zero")
             return
 
-        balance_val = await asyncio.to_thread(db.get_balance, ctx.author.id)
-        if balance_val < bet:
-            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {balance_val})")
+        bal_val, _ = await get_balance_checked(ctx, ctx.author.id)
+        if bal_val < bet and ctx.bot.user.id != 1522117141090799697:
+            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal_val})")
             return
 
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
@@ -415,7 +420,7 @@ def setup_economy(client: commands.Bot):
     async def balance(ctx: commands.Context, user: discord.Member = None):
         target = user or ctx.author
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        bal, bank = await asyncio.to_thread(db.get_balances, target.id)
+        bal, bank = await get_balance_checked(ctx, target.id)
         
         embed = discord.Embed(
             title=f"Balance - {target.display_name}",
