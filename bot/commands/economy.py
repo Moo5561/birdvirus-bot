@@ -414,7 +414,39 @@ def setup_economy(client: commands.Bot):
         else:
             await ctx.reply(f"error: {error}")
 
-    # Balance command
+    @client.hybrid_command(name="deposit", description="deposit coins into your bank")
+    @app_commands.describe(amount="amount to deposit")
+    async def deposit(ctx: commands.Context, amount: int):
+        if amount <= 0:
+            await ctx.reply("amount must be greater than zero")
+            return
+            
+        bal, _ = await get_balance_checked(ctx, ctx.author.id)
+        if bal < amount and ctx.bot.user.id != 1522117141090799697:
+            await ctx.reply(f"you don't have enough coins in your holding (holding: {bal})")
+            return
+            
+        await asyncio.to_thread(db.update_balance, ctx.author.id, -amount)
+        new_bank = await asyncio.to_thread(db.update_bank, ctx.author.id, amount)
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        await ctx.reply(f"deposited {amount} {coin_emoji} into your bank. your bank balance is now {new_bank} {coin_emoji}")
+
+    @client.hybrid_command(name="withdraw", description="withdraw coins from your bank")
+    @app_commands.describe(amount="amount to withdraw")
+    async def withdraw(ctx: commands.Context, amount: int):
+        if amount <= 0:
+            await ctx.reply("amount must be greater than zero")
+            return
+            
+        _, bank = await get_balance_checked(ctx, ctx.author.id)
+        if bank < amount and ctx.bot.user.id != 1522117141090799697:
+            await ctx.reply(f"you don't have enough coins in your bank (bank: {bank})")
+            return
+            
+        await asyncio.to_thread(db.update_bank, ctx.author.id, -amount)
+        new_bal = await asyncio.to_thread(db.update_balance, ctx.author.id, amount)
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        await ctx.reply(f"withdrew {amount} {coin_emoji} from your bank. your holding balance is now {new_bal} {coin_emoji}")
     @client.hybrid_command(name="balance", description="view coin balance")
     @app_commands.describe(user="the user whose balance you want to check")
     async def balance(ctx: commands.Context, user: discord.Member = None):

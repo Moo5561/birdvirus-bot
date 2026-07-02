@@ -144,13 +144,28 @@ def update_balance(user_id: int, change: int) -> int:
     row = cursor.fetchone()
     if row is None:
         new_balance = 100 + change
-        cursor.execute("INSERT INTO economy (user_id, balance) VALUES (?, ?)", (user_id, new_balance))
+        cursor.execute("INSERT INTO economy (user_id, balance, bank) VALUES (?, ?, 0)", (user_id, new_balance))
     else:
         new_balance = row[0] + change
         cursor.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_balance, user_id))
     conn.commit()
     conn.close()
     return new_balance
+
+def update_bank(user_id: int, change: int) -> int:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT bank FROM economy WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    if row is None:
+        new_bank = change
+        cursor.execute("INSERT INTO economy (user_id, balance, bank) VALUES (?, 100, ?)", (user_id, new_bank))
+    else:
+        new_bank = (row[0] or 0) + change
+        cursor.execute("UPDATE economy SET bank = ? WHERE user_id = ?", (new_bank, user_id))
+    conn.commit()
+    conn.close()
+    return new_bank
 
 # Config Functions (Emoji, Properties channel, etc)
 def get_config(key: str, default: str = None) -> str:
