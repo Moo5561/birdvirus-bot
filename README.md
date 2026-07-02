@@ -1,4 +1,6 @@
-# birdvirus-bot
+[](Moo5561/birdvirus-bot/readme-stuff/birdviurs.webp)
+
+### birdvirus-bot
 
 A Discord bot for the birdvirus community.
 
