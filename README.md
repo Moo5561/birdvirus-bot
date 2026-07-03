@@ -31,4 +31,4 @@ if you are reading this when the repo is public, the Gemini key in the version h
 
 ## staff notice
 
-DO NOT EDIT THIS FUCKING README I DONT WANT TO CHANGE IT BECAUSE SOME DUMBASS PUT "TUNG TUNG TUNG SAHUR" IN IT!!!!!!!!!!!!!
+DO EDIT THIS FUCKING README I DO WANT TO CHANGE IT BECAUSE SOME SMARTASS PUT "TUNG TUNG TUNG SAHUR" IN IT!!!!!!!!!!!!!
