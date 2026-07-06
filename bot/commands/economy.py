@@ -13,6 +13,61 @@ async def get_balance_checked(ctx, user_id):
         return 999999999999999999999999999, 999999999999999999999999999
     return await asyncio.to_thread(db.get_balances, user_id)
 
+class BirdvirusGameView(discord.ui.View):
+    def __init__(self, ctx, bet, correct_count, coin_emoji):
+        super().__init__(timeout=60.0)
+        self.ctx = ctx
+        self.bet = bet
+        self.correct_count = correct_count
+        self.coin_emoji = coin_emoji
+        self.message = None
+
+        for i in range(6):
+            button = discord.ui.Button(label=str(i), style=discord.ButtonStyle.blurple, custom_id=f"guess_{i}")
+            button.callback = self.make_callback(i)
+            self.add_item(button)
+
+    def make_callback(self, guess):
+        async def callback(interaction: discord.Interaction):
+            if interaction.user.id != self.ctx.author.id:
+                await interaction.response.send_message("this is not your game dude", ephemeral=True)
+                return
+            
+            self.stop()
+            for item in self.children:
+                item.disabled = True
+            
+            if guess == self.correct_count:
+                multiplier = 5 
+                net_gain = int(self.bet * multiplier) - self.bet
+                new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, net_gain)
+                status = f"correct! there were {self.correct_count} infected birds. you won {net_gain} {self.coin_emoji} (balance: {new_balance})"
+                color = 0x2ecc71
+            else:
+                net_gain = -self.bet
+                new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, net_gain)
+                status = f"wrong! there were {self.correct_count} infected birds. you lost {self.bet} {self.coin_emoji} (balance: {new_balance})"
+                color = 0xe74c3c
+                
+            embed = self.message.embeds[0]
+            embed.color = color
+            embed.set_footer(text=status)
+            await interaction.response.edit_message(embed=embed, view=self)
+        return callback
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        net_gain = -self.bet
+        new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, net_gain)
+        embed = self.message.embeds[0]
+        embed.color = 0xe74c3c
+        embed.set_footer(text=f"timed out! you lost {self.bet} {self.coin_emoji} (balance: {new_balance})")
+        try:
+            await self.message.edit(embed=embed, view=self)
+        except:
+            pass
+
 def setup_economy(client: commands.Bot):
     # Pure Group
     @client.hybrid_group(name="pure", description="pure economy commands")
@@ -274,6 +329,39 @@ def setup_economy(client: commands.Bot):
         embed.color = color
         embed.description = status_text.lower()
         await message.edit(embed=embed)
+
+    @pure_birdvirus_command := pure_group.command(name="birdvirus", description="guess how many birds have the virus")
+    @app_commands.describe(bet="amount of coins to bet")
+    async def pure_birdvirus(ctx: commands.Context, bet: int):
+        if bet <= 0:
+            await ctx.reply("bet must be greater than zero")
+            return
+
+        bal_val, _ = await get_balance_checked(ctx, ctx.author.id)
+        if bal_val < bet and ctx.bot.user.id != 1522117141090799697:
+            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal_val})")
+            return
+
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+
+        num_birds = 5
+        infected_count = random.randint(0, num_birds)
+        
+        statuses = [True] * infected_count + [False] * (num_birds - infected_count)
+        random.shuffle(statuses)
+        
+        embed = discord.Embed(title="birdvirus scanner", color=0x2f3136)
+        desc = "a flock of birds appeared! some of them might have the birdvirus. guess how many are infected.\n\n"
+        
+        for i, is_infected in enumerate(statuses):
+            status_str = "🦠 infected" if is_infected else "✅ healthy"
+            desc += f"bird {i+1}: ||`{status_str}`||\n"
+            
+        desc += f"\nbet: {bet} {coin_emoji}"
+        embed.description = desc
+        
+        view = BirdvirusGameView(ctx, bet, infected_count, coin_emoji)
+        view.message = await ctx.reply(embed=embed, view=view)
 
     @pure_plinko_command := pure_group.command(name="plinko", description="drop the ball down the plinko board")
     @app_commands.describe(bet="amount of coins to bet")
