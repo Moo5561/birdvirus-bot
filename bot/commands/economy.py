@@ -449,14 +449,14 @@ def setup_economy(client: commands.Bot):
                         row_pegs.append('🔴')
                     else:
                         row_pegs.append('⚪')
-                rows.append(''.join(row_pegs))
-            embed.description = "```\n  ⬇️\n" + "\n".join(rows) + "\n```\ndropping..."
+                rows.append('  '.join(row_pegs))
+            embed.description = "```\n            ⬇️\n" + "\n".join(rows) + "\n```\ndropping..."
             await message.edit(embed=embed)
 
         await asyncio.sleep(0.5)
 
-        slots_row = ''.join([f'[{s}]' for s in slot_labels])
-        mults_row = '  '.join([f'{m}x' for m in multipliers])
+        slots_row = '  '.join(slot_labels)
+        mults_row = ' 15x   5x   2x  0.5x  2x   5x   15x'
 
         net_gain = int(bet * multiplier) - bet
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
@@ -480,8 +480,8 @@ def setup_economy(client: commands.Bot):
                     row_pegs.append('🔴')
                 else:
                     row_pegs.append('⚪')
-            rows.append(''.join(row_pegs))
-        embed.description = "```\n  ⬇️\n" + "\n".join(rows) + f"\n{slots_row}\n{mults_row}\n```\n{status.lower()}"
+            rows.append('  '.join(row_pegs))
+        embed.description = "```\n            ⬇️\n" + "\n".join(rows) + f"\n{slots_row}\n{mults_row}\n```\n{status.lower()}"
         await message.edit(embed=embed)
 
     @pure_horse_command := pure_group.command(name="horse", description="bet on a horse race at the birdvirus track")
