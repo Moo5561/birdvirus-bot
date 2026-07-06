@@ -133,7 +133,14 @@ def get_balance(user_id: int) -> int:
 def set_balance(user_id: int, amount: int):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO economy (user_id, balance) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET balance = ?", (user_id, amount, amount))
+    cursor.execute("INSERT INTO economy (user_id, balance, bank) VALUES (?, ?, 0) ON CONFLICT(user_id) DO UPDATE SET balance = ?", (user_id, amount, amount))
+    conn.commit()
+    conn.close()
+
+def set_bank(user_id: int, amount: int):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO economy (user_id, balance, bank) VALUES (?, 100, ?) ON CONFLICT(user_id) DO UPDATE SET bank = ?", (user_id, amount, amount))
     conn.commit()
     conn.close()
 

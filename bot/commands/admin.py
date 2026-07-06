@@ -232,7 +232,7 @@ def setup_admin(client: commands.Bot):
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         await ctx.reply(f"reset {user.display_name}s balance to 100 {coin_emoji}")
 
-    @ec_set_command := ec_group.command(name="set", description="set a user's balance (admin only)")
+    @ec_set_command := ec_group.command(name="set", description="set a user's holding balance (admin only)")
     @is_admin()
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(user="the user whose balance to set", amount="the new balance amount")
@@ -242,4 +242,16 @@ def setup_admin(client: commands.Bot):
             return
         await asyncio.to_thread(db.set_balance, user.id, amount)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        await ctx.reply(f"set {user.display_name}s balance to {amount} {coin_emoji}")
+        await ctx.reply(f"set {user.display_name}s holding balance to {amount} {coin_emoji}")
+
+    @ec_setbank_command := ec_group.command(name="setbank", description="set a user's bank balance (admin only)")
+    @is_admin()
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(user="the user whose bank balance to set", amount="the new bank balance amount")
+    async def ec_setbank(ctx: commands.Context, user: discord.Member, amount: int):
+        if amount < 0:
+            await ctx.reply("amount cannot be negative")
+            return
+        await asyncio.to_thread(db.set_bank, user.id, amount)
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        await ctx.reply(f"set {user.display_name}s bank balance to {amount} {coin_emoji}")
