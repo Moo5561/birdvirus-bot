@@ -436,7 +436,7 @@ def setup_economy(client: commands.Bot):
         multiplier = multipliers[final_slot]
 
         embed = discord.Embed(title="plinko", color=0x2f3136)
-        embed.description = "```\n  ⬇️\n```\ndropping..."
+        embed.description = "```\n      ⬇️\n```\ndropping..."
         message = await ctx.reply(embed=embed)
 
         for frame in range(1, 8):
@@ -450,7 +450,7 @@ def setup_economy(client: commands.Bot):
                     else:
                         row_pegs.append('⚪')
                 rows.append(' '.join(row_pegs))
-            embed.description = "```\n       ⬇️\n" + "\n".join(rows) + "\n```\ndropping..."
+            embed.description = "```\n      ⬇️\n" + "\n".join(rows) + "\n```\ndropping..."
             await message.edit(embed=embed)
 
         await asyncio.sleep(0.5)
@@ -481,7 +481,7 @@ def setup_economy(client: commands.Bot):
                 else:
                     row_pegs.append('⚪')
             rows.append(' '.join(row_pegs))
-        embed.description = "```\n       ⬇️\n" + "\n".join(rows) + f"\n{slots_row}\n{mults_row}\n```\n{status.lower()}"
+        embed.description = "```\n      ⬇️\n" + "\n".join(rows) + f"\n{slots_row}\n{mults_row}\n```\n{status.lower()}"
         await message.edit(embed=embed)
 
     @pure_horse_command := pure_group.command(name="horse", description="bet on a horse race at the birdvirus track")
