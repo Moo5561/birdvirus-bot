@@ -14,18 +14,41 @@ async def get_balance_checked(ctx, user_id):
     return await asyncio.to_thread(db.get_balances, user_id)
 
 class BirdvirusGameView(discord.ui.View):
-    def __init__(self, ctx, bet, correct_count, coin_emoji):
+    def __init__(self, ctx, bet, birds_data, correct_count, coin_emoji):
         super().__init__(timeout=60.0)
         self.ctx = ctx
         self.bet = bet
+        self.birds_data = birds_data
         self.correct_count = correct_count
         self.coin_emoji = coin_emoji
         self.message = None
 
+        options = [
+            discord.SelectOption(label=f"Inspect Bird {i+1}", value=str(i), description="Check where it's been and what it ate")
+            for i in range(len(birds_data))
+        ]
+        self.select = discord.ui.Select(placeholder="Select a bird to inspect...", options=options, row=0)
+        self.select.callback = self.select_callback
+        self.add_item(self.select)
+
         for i in range(6):
-            button = discord.ui.Button(label=str(i), style=discord.ButtonStyle.blurple, custom_id=f"guess_{i}")
+            button = discord.ui.Button(label=str(i), style=discord.ButtonStyle.blurple, custom_id=f"guess_{i}", row=1 if i < 5 else 2)
             button.callback = self.make_callback(i)
             self.add_item(button)
+
+    async def select_callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message("this is not your game dude", ephemeral=True)
+            return
+            
+        bird_idx = int(self.select.values[0])
+        bird = self.birds_data[bird_idx]
+        
+        embed = self.message.embeds[0]
+        embed.clear_fields()
+        embed.add_field(name=f"Bird {bird_idx + 1} Dossier", value=f"**Location History:** {bird['location']}\n**Recent Diet:** {bird['food']}\n**Status:** ❓ Unknown", inline=False)
+        
+        await interaction.response.edit_message(embed=embed, view=self)
 
     def make_callback(self, guess):
         async def callback(interaction: discord.Interaction):
@@ -51,6 +74,14 @@ class BirdvirusGameView(discord.ui.View):
                 
             embed = self.message.embeds[0]
             embed.color = color
+            embed.clear_fields()
+            
+            reveal_text = ""
+            for i, bird in enumerate(self.birds_data):
+                status_emoji = "🦠 infected" if bird['infected'] else "✅ healthy"
+                reveal_text += f"Bird {i+1}: {status_emoji}\n"
+            
+            embed.add_field(name="Final Results", value=reveal_text, inline=False)
             embed.set_footer(text=status)
             await interaction.response.edit_message(embed=embed, view=self)
         return callback
@@ -344,23 +375,37 @@ def setup_economy(client: commands.Bot):
 
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
 
+        high_risk_locs = ["a quarantined zone", "a biohazard waste dump", "a glowing green puddle", "an abandoned testing lab", "the sewer drains"]
+        low_risk_locs = ["a clean park", "a fresh bird feeder", "someone's balcony", "a nice oak tree", "a local garden"]
+        
+        high_risk_foods = ["a glowing worm", "discarded medical waste", "a suspicious radioactive berry", "pure plutonium", "a moldy french fry"]
+        low_risk_foods = ["fresh seeds", "a normal earthworm", "a breadcrumb", "a standard bug", "some grass"]
+
         num_birds = 5
         infected_count = random.randint(0, num_birds)
         
         statuses = [True] * infected_count + [False] * (num_birds - infected_count)
         random.shuffle(statuses)
         
-        embed = discord.Embed(title="birdvirus scanner", color=0x2f3136)
-        desc = "a flock of birds appeared! some of them might have the birdvirus. guess how many are infected.\n\n"
-        
-        for i, is_infected in enumerate(statuses):
-            status_str = "🦠 infected" if is_infected else "✅ healthy"
-            desc += f"bird {i+1}: ||`{status_str}`||\n"
+        birds_data = []
+        for is_infected in statuses:
+            if is_infected:
+                loc = random.choice(high_risk_locs) if random.random() < 0.7 else random.choice(low_risk_locs)
+                food = random.choice(high_risk_foods) if random.random() < 0.7 else random.choice(low_risk_foods)
+            else:
+                loc = random.choice(high_risk_locs) if random.random() < 0.1 else random.choice(low_risk_locs)
+                food = random.choice(high_risk_foods) if random.random() < 0.1 else random.choice(low_risk_foods)
             
-        desc += f"\nbet: {bet} {coin_emoji}"
-        embed.description = desc
+            birds_data.append({
+                "infected": is_infected,
+                "location": loc,
+                "food": food
+            })
         
-        view = BirdvirusGameView(ctx, bet, infected_count, coin_emoji)
+        embed = discord.Embed(title="birdvirus scanner", color=0x2f3136)
+        embed.description = f"a flock of 5 birds appeared! some of them might have the birdvirus.\nuse the dropdown menu to inspect each bird's history, then guess how many are infected.\n\nbet: {bet} {coin_emoji}"
+        
+        view = BirdvirusGameView(ctx, bet, birds_data, infected_count, coin_emoji)
         view.message = await ctx.reply(embed=embed, view=view)
 
     @pure_plinko_command := pure_group.command(name="plinko", description="drop the ball down the plinko board")
