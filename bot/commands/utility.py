@@ -171,7 +171,7 @@ def setup_utility(client: commands.Bot):
         except Exception as e:
             print(f"error in chat command: {e}")
             await ctx.reply("something went wrong.")
-                    return
+            return
         
         if "content" not in message_data:
             await ctx.reply(f"api error: ```{data}```")
