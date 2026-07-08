@@ -152,6 +152,12 @@ def setup_utility(client: commands.Bot):
                         timeout=aiohttp.ClientTimeout(total=30)
                     ) as resp:
                         data = await resp.json()
+                        status = resp.status
+
+            if status != 200:
+                print(f"api error: status {status}, data: {data}")
+                await ctx.reply(f"api error (status {status}): ```{data}```")
+                return
 
             if "choices" not in data:
                 await ctx.reply(f"api error: ```{data}```")
@@ -168,6 +174,7 @@ def setup_utility(client: commands.Bot):
                 for tool_call in message_data["tool_calls"]:
                     if tool_call.get("function", {}).get("name") == "ignore":
                         print(f"birdvirus bot chose to ignore the message. reason: {tool_call.get('function', {}).get('arguments')}")
+                        return
         except Exception as e:
             print(f"error in chat command: {e}")
             await ctx.reply("something went wrong.")
