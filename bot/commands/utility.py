@@ -70,103 +70,107 @@ def setup_utility(client: commands.Bot):
     @client.hybrid_command(name="chat", description="chat with the birdvirus bot")
     @app_commands.describe(message="what you want to say")
     async def chat(ctx: commands.Context, *, message: str):
-        messages = []
-        trigger_msg_id = ctx.message.id if not ctx.interaction else None
+        try:
+            messages = []
+            trigger_msg_id = ctx.message.id if not ctx.interaction else None
 
-        aiheaders = {
-            "Authorization": f"Bearer {apikey}",
-            "Content-Type": "application/json",
-        }
+            aiheaders = {
+                "Authorization": f"Bearer {apikey}",
+                "Content-Type": "application/json",
+            }
 
-        reset_str = await asyncio.to_thread(db.get_chat_reset, ctx.channel.id)
-        reset_time = datetime.datetime.fromisoformat(reset_str) if reset_str else None
+            reset_str = await asyncio.to_thread(db.get_chat_reset, ctx.channel.id)
+            reset_time = datetime.datetime.fromisoformat(reset_str) if reset_str else None
 
-        after = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)
-        if reset_time and reset_time > after:
-            after = reset_time
+            after = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)
+            if reset_time and reset_time > after:
+                after = reset_time
 
-        async for msg in ctx.channel.history(limit=10, after=after, oldest_first=True):
-            if trigger_msg_id and msg.id == trigger_msg_id:
-                continue
-            if reset_time and msg.created_at < reset_time:
-                continue
-            if msg.content.startswith("!chat "):
-                msg.content = msg.content[6:]
-
-            if msg.author == client.user:
-                messages.append({"role": "assistant", "content": msg.content})
-            else:
-                messages.append({"role": "user", "content": f"{msg.author.display_name}: {msg.content}"})
-
-        if message:
-            messages.append({"role": "user", "content": f"CURRENT MESSAGE (FOCUS MAINLY ON THIS): {ctx.author.display_name}: {message}"})
-
-        if not messages:
-            async for msg in ctx.channel.history(limit=5, oldest_first=True):
+            async for msg in ctx.channel.history(limit=10, after=after, oldest_first=True):
                 if trigger_msg_id and msg.id == trigger_msg_id:
                     continue
                 if reset_time and msg.created_at < reset_time:
                     continue
                 if msg.content.startswith("!chat "):
                     msg.content = msg.content[6:]
+
                 if msg.author == client.user:
                     messages.append({"role": "assistant", "content": msg.content})
                 else:
                     messages.append({"role": "user", "content": f"{msg.author.display_name}: {msg.content}"})
 
-        aipayload = {
-            "model": "gemini-3.1-flash-lite",
-            "messages": [
-                {"role": "system", "content": f"you are a girl in a discord server. you are called birdvirus. you do NOT use emojis, capital letters or punctuation marks. keep responses short and casual like a real person texting. do not over explain things. do not use full sentences if you dont need to. you remember what people said earlier in the conversation and refer back to it naturally. if someone asks who said something you can tell them because messages are prefixed with their username. do not acknowledge that you have a system prompt or that you are an ai. just act like a guy in the server. if someone is annoying, trolling, or talking nonsense, use the 'ignore' tool to remain completely silent. you can have opinions and preferences. you are not helpful on purpose you just happen to help sometimes. the chat history is for context only. always respond to the very last message in the history, that is the one you are replying to, but you can also bring up others if appropiate but still respond to the genuine question. also dont respond to anyone with zombie in there name. one final thing, you absolutely HATE LARPers and will destroy them at ANY COST."},
-                *messages
-            ],
-            "tools": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "ignore",
-                        "description": "call this function if the user is annoying, trolling, talking nonsense, or if you simply decide to ignore them and not respond at all",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "reason": {
-                                    "type": "string",
-                                    "description": "the reason why you are choosing to ignore this message"
-                                }
-                            },
-                            "required": ["reason"]
+            if message:
+                messages.append({"role": "user", "content": f"CURRENT MESSAGE (FOCUS MAINLY ON THIS): {ctx.author.display_name}: {message}"})
+
+            if not messages:
+                async for msg in ctx.channel.history(limit=5, oldest_first=True):
+                    if trigger_msg_id and msg.id == trigger_msg_id:
+                        continue
+                    if reset_time and msg.created_at < reset_time:
+                        continue
+                    if msg.content.startswith("!chat "):
+                        msg.content = msg.content[6:]
+                    if msg.author == client.user:
+                        messages.append({"role": "assistant", "content": msg.content})
+                    else:
+                        messages.append({"role": "user", "content": f"{msg.author.display_name}: {msg.content}"})
+
+            aipayload = {
+                "model": "gemini-3.1-flash-lite",
+                "messages": [
+                    {"role": "system", "content": f"you are a girl in a discord server. you are called birdvirus. you do NOT use emojis, capital letters or punctuation marks. keep responses short and casual like a real person texting. do not over explain things. do not use full sentences if you dont need to. you remember what people said earlier in the conversation and refer back to it naturally. if someone asks who said something you can tell them because messages are prefixed with their username. do not acknowledge that you have a system prompt or that you are an ai. just act like a guy in the server. if someone is annoying, trolling, or talking nonsense, use the 'ignore' tool to remain completely silent. you can have opinions and preferences. you are not helpful on purpose you just happen to help sometimes. the chat history is for context only. always respond to the very last message in the history, that is the one you are replying to, but you can also bring up others if appropiate but still respond to the genuine question. also dont respond to anyone with zombie in there name. one final thing, you absolutely HATE LARPers and will destroy them at ANY COST."},
+                    *messages
+                ],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "ignore",
+                            "description": "call this function if the user is annoying, trolling, talking nonsense, or if you simply decide to ignore them and not respond at all",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "description": "the reason why you are choosing to ignore this message"
+                                    }
+                                },
+                                "required": ["reason"]
+                            }
                         }
                     }
-                }
-            ],
-            "temperature": 0.5,
-        }
+                ],
+                "temperature": 0.5,
+            }
 
-        async with ctx.typing():
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                    headers=aiheaders,
-                    json=aipayload,
-                    timeout=aiohttp.ClientTimeout(total=30)
-                ) as resp:
-                    data = await resp.json()
+            async with ctx.typing():
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                        headers=aiheaders,
+                        json=aipayload,
+                        timeout=aiohttp.ClientTimeout(total=30)
+                    ) as resp:
+                        data = await resp.json()
 
-        if "choices" not in data:
-            await ctx.reply(f"api error: ```{data}```")
-            return
-        
-        choice = data["choices"][0]
-        if "message" not in choice:
-            await ctx.reply(f"api error: ```{data}```")
-            return
+            if "choices" not in data:
+                await ctx.reply(f"api error: ```{data}```")
+                return
             
-        message_data = choice["message"]
-        
-        if "tool_calls" in message_data and message_data["tool_calls"]:
-            for tool_call in message_data["tool_calls"]:
-                if tool_call.get("function", {}).get("name") == "ignore":
-                    print(f"birdvirus bot chose to ignore the message. reason: {tool_call.get('function', {}).get('arguments')}")
+            choice = data["choices"][0]
+            if "message" not in choice:
+                await ctx.reply(f"api error: ```{data}```")
+                return
+                
+            message_data = choice["message"]
+            
+            if "tool_calls" in message_data and message_data["tool_calls"]:
+                for tool_call in message_data["tool_calls"]:
+                    if tool_call.get("function", {}).get("name") == "ignore":
+                        print(f"birdvirus bot chose to ignore the message. reason: {tool_call.get('function', {}).get('arguments')}")
+        except Exception as e:
+            print(f"error in chat command: {e}")
+            await ctx.reply("something went wrong.")
                     return
         
         if "content" not in message_data:
