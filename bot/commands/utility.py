@@ -7,7 +7,7 @@ import asyncio
 import os
 import discord
 import discord.ext.commands as commands
-from discord import app_commands
+from discord import app_commands, AppInstallationContext, AllowedContexts
 from bot.config import apikey
 import bot.db as db
 from playwright.async_api import async_playwright
@@ -18,6 +18,14 @@ def setup_utility(client: commands.Bot):
     @client.hybrid_command(name="ping", description="pong :p")
     async def ping_cmd(ctx: commands.Context):
         await ctx.reply("pong :p")
+
+    # cmds
+    @client.hybrid_command(name="cmds", description="list all available commands")
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+    @app_commands.allowed_installs(guilds=True, users=True)
+    async def cmds_cmd(ctx: commands.Context):
+        cmd_list = [f"/{cmd.name} - {cmd.description}" for cmd in client.tree.get_commands()]
+        await ctx.reply("\n".join(cmd_list), ephemeral=True)
 
     # gif
     @client.hybrid_command(name="gif", description="get a free cool gif from my gifs")
