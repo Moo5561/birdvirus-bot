@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import discord
 import discord.ext.commands as commands
+from discord import app_commands
 import bot.db as db
 import os
 from bot.commands import is_admin
