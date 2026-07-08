@@ -2,8 +2,8 @@ import asyncio
 import datetime
 import discord
 import discord.ext.commands as commands
-from discord import app_commands
 import bot.db as db
+import os
 from bot.commands import is_admin
 
 def setup_admin(client: commands.Bot):
@@ -35,6 +35,29 @@ def setup_admin(client: commands.Bot):
             response_text = response_text[:1900] + "\n..."
         
         await ctx.reply(f"### say logs\n{response_text}", ephemeral=True)
+
+    @view_logs_command := view_group.command(name="logs", description="view the bot logs")
+    @is_admin()
+    async def view_logs(ctx: commands.Context):
+        log_path = "bot.log"
+        if not os.path.exists(log_path):
+            await ctx.reply("no bot.log file found.", ephemeral=True)
+            return
+
+        with open(log_path, "r") as f:
+            lines = f.readlines()
+            
+        last_lines = lines[-15:]
+        response_text = "".join(last_lines)
+        
+        if not response_text.strip():
+            await ctx.reply("log file is empty.", ephemeral=True)
+            return
+            
+        if len(response_text) > 1900:
+            response_text = response_text[-1900:]
+            
+        await ctx.reply(f"### last 15 lines of bot.log\n```{response_text}```", ephemeral=True)
 
     # Clear Group
     @client.hybrid_group(name="clear", description="clear logs and other data")
