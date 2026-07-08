@@ -7,7 +7,7 @@ import asyncio
 import os
 import discord
 import discord.ext.commands as commands
-from discord import app_commands, AppInstallationContext, AllowedContexts
+from discord import app_commands
 from bot.config import apikey
 import bot.db as db
 from playwright.async_api import async_playwright
