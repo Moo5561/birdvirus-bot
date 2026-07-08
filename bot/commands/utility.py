@@ -7,7 +7,7 @@ import asyncio
 import os
 import discord
 import discord.ext.commands as commands
-from discord import app_commands, AppInstallationContext, AllowedContexts
+from discord import app_commands
 from bot.config import apikey
 import bot.db as db
 from playwright.async_api import async_playwright
@@ -18,14 +18,6 @@ def setup_utility(client: commands.Bot):
     @client.hybrid_command(name="ping", description="pong :p")
     async def ping_cmd(ctx: commands.Context):
         await ctx.reply("pong :p")
-
-    # cmds
-    @client.hybrid_command(name="cmds", description="list all available commands")
-    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
-    @app_commands.allowed_installs(guilds=True, users=True)
-    async def cmds_cmd(ctx: commands.Context):
-        cmd_list = [f"/{cmd.name} - {cmd.description}" for cmd in client.tree.get_commands()]
-        await ctx.reply("\n".join(cmd_list), ephemeral=True)
 
     # gif
     @client.hybrid_command(name="gif", description="get a free cool gif from my gifs")
@@ -80,48 +72,52 @@ def setup_utility(client: commands.Bot):
     async def chat(ctx: commands.Context, *, message: str):
         try:
             messages = []
-            trigger_msg_id = ctx.message.id if not ctx.interaction else None
+            
+            if not ctx.interaction:
+                trigger_msg_id = ctx.message.id
+                aiheaders = {
+                    "Authorization": f"Bearer {apikey}",
+                    "Content-Type": "application/json",
+                }
 
-            aiheaders = {
-                "Authorization": f"Bearer {apikey}",
-                "Content-Type": "application/json",
-            }
+                reset_str = await asyncio.to_thread(db.get_chat_reset, ctx.channel.id)
+                reset_time = datetime.datetime.fromisoformat(reset_str) if reset_str else None
 
-            reset_str = await asyncio.to_thread(db.get_chat_reset, ctx.channel.id)
-            reset_time = datetime.datetime.fromisoformat(reset_str) if reset_str else None
+                after = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)
+                if reset_time and reset_time > after:
+                    after = reset_time
 
-            after = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)
-            if reset_time and reset_time > after:
-                after = reset_time
-
-            async for msg in ctx.channel.history(limit=10, after=after, oldest_first=True):
-                if trigger_msg_id and msg.id == trigger_msg_id:
-                    continue
-                if reset_time and msg.created_at < reset_time:
-                    continue
-                if msg.content.startswith("!chat "):
-                    msg.content = msg.content[6:]
-
-                if msg.author == client.user:
-                    messages.append({"role": "assistant", "content": msg.content})
-                else:
-                    messages.append({"role": "user", "content": f"{msg.author.display_name}: {msg.content}"})
-
-            if message:
-                messages.append({"role": "user", "content": f"CURRENT MESSAGE (FOCUS MAINLY ON THIS): {ctx.author.display_name}: {message}"})
-
-            if not messages:
-                async for msg in ctx.channel.history(limit=5, oldest_first=True):
-                    if trigger_msg_id and msg.id == trigger_msg_id:
+                async for msg in ctx.channel.history(limit=10, after=after, oldest_first=True):
+                    if msg.id == trigger_msg_id:
                         continue
                     if reset_time and msg.created_at < reset_time:
                         continue
                     if msg.content.startswith("!chat "):
                         msg.content = msg.content[6:]
+
                     if msg.author == client.user:
                         messages.append({"role": "assistant", "content": msg.content})
                     else:
                         messages.append({"role": "user", "content": f"{msg.author.display_name}: {msg.content}"})
+
+                if message:
+                    messages.append({"role": "user", "content": f"CURRENT MESSAGE (FOCUS MAINLY ON THIS): {ctx.author.display_name}: {message}"})
+
+                if not messages:
+                    async for msg in ctx.channel.history(limit=5, oldest_first=True):
+                        if msg.id == trigger_msg_id:
+                            continue
+                        if reset_time and msg.created_at < reset_time:
+                            continue
+                        if msg.content.startswith("!chat "):
+                            msg.content = msg.content[6:]
+                        if msg.author == client.user:
+                            messages.append({"role": "assistant", "content": msg.content})
+                        else:
+                            messages.append({"role": "user", "content": f"{msg.author.display_name}: {msg.content}"})
+            else:
+                # slash command: just use the message
+                messages.append({"role": "user", "content": f"{ctx.author.display_name}: {message}"})
 
             aipayload = {
                 "model": "gemini-3.1-flash-lite",
@@ -149,6 +145,11 @@ def setup_utility(client: commands.Bot):
                     }
                 ],
                 "temperature": 0.5,
+            }
+            
+            aiheaders = {
+                "Authorization": f"Bearer {apikey}",
+                "Content-Type": "application/json",
             }
 
             async with ctx.typing():
