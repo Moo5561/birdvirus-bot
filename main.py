@@ -2,10 +2,20 @@ import discord
 import aiohttp
 import datetime
 import argparse
+import logging
 import discord.ext.commands as commands
 import bot.events
 import bot.commands
 from bot.config import token
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("bot.log"),
+        logging.StreamHandler()
+    ]
+)
 
 parser = argparse.ArgumentParser(description="run the birdvirus bot")
 parser.add_argument("--host", required=True, help="who is hosting the bot currently")
