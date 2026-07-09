@@ -218,3 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# birdvirus bot files
+birdvirus.db
+generated_media/
+mp3/tts_*.mp3
+test_*.py
+bot.log
