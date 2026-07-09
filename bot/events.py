@@ -15,7 +15,7 @@ def setup(client: commands.Bot):
         global BANNED_USERS
         BANNED_USERS = await asyncio.to_thread(db.get_banned_users)
         # Add the initial hardbanned users to db if not there
-        for uid in [924850244435460136, 1205487376105734184]:
+        for uid in [924850244435460136, 1205487376105734184, 1494758877898477690, 1316825719820779576, 1318032136976072744, 1208819266338553957]:
             if uid not in BANNED_USERS:
                 await asyncio.to_thread(db.ban_user, uid)
                 BANNED_USERS.add(uid)
