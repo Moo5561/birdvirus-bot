@@ -24,7 +24,7 @@ args = parser.parse_args()
 def get_prefix(bot, message):
     if bot.user and bot.user.id == 1522117141090799697:
         return "ht!"
-    return "!"
+    return "%"
 
 intents = discord.Intents.default()
 intents.message_content = True

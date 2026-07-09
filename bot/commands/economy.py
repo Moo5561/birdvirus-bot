@@ -361,6 +361,67 @@ def setup_economy(client: commands.Bot):
         embed.description = status_text.lower()
         await message.edit(embed=embed)
 
+    @pure_insaneroll_command := pure_group.command(name="insaneroll", description="roll a d20 with insane stakes")
+    @app_commands.describe(bet="the amount of coins to bet")
+    async def pure_insaneroll(ctx: commands.Context, bet: int):
+        if bet <= 0:
+            await ctx.reply("bet must be greater than zero")
+            return
+            
+        bal, bank = await get_balance_checked(ctx, ctx.author.id)
+        if bal < bet and ctx.bot.user.id != 1522117141090799697:
+            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
+            return
+            
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "dYT")
+        
+        roll = random.randint(1, 20)
+        
+        if roll == 1:
+            multiplier = -5
+            status = "CRITICAL FAILURE! you rolled a 1. you lost 5x your bet!"
+        elif 2 <= roll <= 9:
+            multiplier = 0
+            status = f"failure. you rolled a {roll}. lost your bet."
+        elif 10 <= roll <= 15:
+            multiplier = 2
+            status = f"success. you rolled a {roll}. doubled your bet."
+        elif 16 <= roll <= 19:
+            multiplier = 5
+            status = f"great success! you rolled a {roll}. 5x your bet."
+        else: # 20
+            multiplier = 20
+            status = "NATURAL 20! INSANE SUCCESS! 20x your bet!"
+            
+        if multiplier < 0:
+            net_gain = int(bet * multiplier) # -5x
+            # check if we need to drain bank
+            if bal + bank < abs(net_gain):
+                net_gain = -(bal + bank) # drain everything
+            
+            # update holding first
+            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, -bal if bal < abs(net_gain) else net_gain)
+            remaining_debt = abs(net_gain) - bal if bal < abs(net_gain) else 0
+            if remaining_debt > 0:
+                await asyncio.to_thread(db.update_bank, ctx.author.id, -remaining_debt)
+                new_balance = 0
+        elif multiplier == 0:
+            net_gain = -bet
+            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
+        else:
+            net_gain = int(bet * multiplier) - bet
+            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
+            
+        if multiplier <= 0:
+            color = 0xe74c3c if roll != 1 else 0x992d22
+            status_text = f"**d20 ROLL: {roll}**\n{status}\nyou lost {abs(net_gain)} {coin_emoji}. (holding balance: {new_balance})"
+        else:
+            color = 0x2ecc71 if roll != 20 else 0xf1c40f
+            status_text = f"**d20 ROLL: {roll}**\n{status}\nyou won {net_gain} {coin_emoji}! (holding balance: {new_balance})"
+            
+        embed = discord.Embed(title="insane dice roll", description=status_text.lower(), color=color)
+        await ctx.reply(embed=embed)
+
     @pure_birdvirus_command := pure_group.command(name="birdvirus", description="guess how many birds have the virus")
     @app_commands.describe(bet="amount of coins to bet")
     async def pure_birdvirus(ctx: commands.Context, bet: int):
