@@ -62,12 +62,35 @@ def is_admin():
         return False;
     return commands.check(predicate);
 
+def is_bot_dev():
+    async def predicate(ctx: commands.Context):
+        AUTHORIZED_USERS = [
+            1048423590623727686, 1278489064210956378, 1421940246492352612, 
+            1246945967102623755, 1488967988207157308, 274556515061465088, 
+            983544114635235430, 1100425178359533691
+        ]
+        if ctx.author.id in AUTHORIZED_USERS:
+            return True;
+
+        admin_ids_str = await asyncio.to_thread(db.get_config, "admin_ids");
+        if admin_ids_str:
+            try:
+                admin_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip()];
+                if ctx.author.id in admin_ids:
+                    return True;
+            except Exception as e:
+                print(f"error parsing admin_ids config: {e}");
+                
+        return False;
+    return commands.check(predicate);
+
 from .blackjack import setup_blackjack
 from .voice import setup_voice
 from .economy import setup_economy
 from .admin import setup_admin
 from .utility import setup_utility
 from .horserace import setup_horserace
+from .job import setup_job
 
 def setup(client: commands.Bot):
     setup_blackjack(client)
@@ -76,3 +99,4 @@ def setup(client: commands.Bot):
     setup_horserace(client)
     setup_admin(client)
     setup_utility(client)
+    setup_job(client)

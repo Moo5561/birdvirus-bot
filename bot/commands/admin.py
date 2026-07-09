@@ -5,13 +5,12 @@ import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
 import os
-from bot.commands import is_admin
+from bot.commands import is_admin, is_bot_dev
 
 def setup_admin(client: commands.Bot):
     # Ban Commands
-    @client.hybrid_command(name="ban", description="ban a user from using the bot (admin only)")
-    @is_admin()
-    @app_commands.default_permissions(administrator=True)
+    @client.hybrid_command(name="ban", description="ban a user from using the bot (bot devs only)")
+    @is_bot_dev()
     @app_commands.describe(user="the user to ban")
     async def ban_cmd(ctx: commands.Context, user: discord.Member):
         import bot.events
@@ -19,9 +18,8 @@ def setup_admin(client: commands.Bot):
         bot.events.BANNED_USERS.add(user.id)
         await ctx.reply(f"{user.mention} has been banned from using the bot.")
 
-    @client.hybrid_command(name="unban", description="unban a user from using the bot (admin only)")
-    @is_admin()
-    @app_commands.default_permissions(administrator=True)
+    @client.hybrid_command(name="unban", description="unban a user from using the bot (bot devs only)")
+    @is_bot_dev()
     @app_commands.describe(user="the user to unban")
     async def unban_cmd(ctx: commands.Context, user: discord.Member):
         import bot.events
