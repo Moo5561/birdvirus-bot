@@ -322,4 +322,11 @@ def update_job_progress(user_id: int, xp_gain: int, time_str: str):
     conn.close()
     return level_up, level
 
+def update_job_time(user_id: int, time_str: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE user_jobs SET last_work_time = ? WHERE user_id = ?", (time_str, user_id))
+    conn.commit()
+    conn.close()
+
 init_db()

@@ -684,7 +684,7 @@ def setup_job(client: commands.Bot):
             if diff < cooldown_dt:
                 remaining = cooldown_dt - diff
                 mins, secs = divmod(remaining.total_seconds(), 60)
-                await ctx.reply(f"you are on break! your next shift starts in {int(mins)}m {int(secs)}s.", ephemeral=True)
+                await ctx.reply(f"you are on break! your next shift starts in {int(mins)}m {int(secs)}s. (try `/job beg` if you're desperate)", ephemeral=True)
                 return
                 
         title = get_job_title(job_name, job_data["job_level"])
@@ -713,3 +713,45 @@ def setup_job(client: commands.Bot):
             return
             
         view.message = await ctx.reply(embed=embed, view=view)
+
+    @job_group.command(name="beg", description="beg your boss to let you off break early")
+    @commands.cooldown(1, 120, commands.BucketType.user)
+    async def job_beg(ctx: commands.Context):
+        job_data = await asyncio.to_thread(db.get_user_job, ctx.author.id)
+        if not job_data:
+            await ctx.reply("you don't even have a job to beg for. go apply first.")
+            return
+            
+        job_name = job_data["job_name"]
+        info = JOBS[job_name]
+        
+        if not job_data["last_work_time"]:
+            await ctx.reply("you aren't even on break... get back to work! `/job work`")
+            return
+            
+        last_work = datetime.fromisoformat(job_data["last_work_time"])
+        now = datetime.utcnow()
+        diff = now - last_work
+        cooldown_dt = timedelta(minutes=info["cooldown_minutes"])
+        
+        if diff >= cooldown_dt:
+            await ctx.reply("you are already off break! run `/job work` to start your shift.")
+            return
+            
+        success = random.random() < 0.35  # 35% chance to get off break
+        
+        if success:
+            await asyncio.to_thread(db.update_job_time, ctx.author.id, None)
+            await ctx.reply("your boss sighed and told you to get back to work. you are off break! run `/job work`.")
+        else:
+            penalty = timedelta(minutes=random.randint(1, 3))
+            new_last_work = last_work + penalty
+            await asyncio.to_thread(db.update_job_time, ctx.author.id, new_last_work.isoformat())
+            await ctx.reply(f"your boss got mad and told you to get out of his office. your break was extended by {penalty.total_seconds() // 60:.0f} minutes!")
+
+    @job_beg.error
+    async def job_beg_error(ctx: commands.Context, error):
+        if isinstance(error, commands.CommandOnCooldown):
+            await ctx.reply(f"your boss is ignoring you right now. try again in {error.retry_after:.1f}s", ephemeral=True)
+        else:
+            await ctx.reply(f"error: {error}")
