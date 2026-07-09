@@ -2,7 +2,24 @@ import discord
 import random
 import discord.ext.commands as commands
 
+BANNED_USERS = {924850244435460136, 1205487376105734184}
+
+class UserBanned(commands.CheckFailure):
+    pass
+
 def setup(client: commands.Bot):
+    @client.check
+    async def globally_block_banned(ctx):
+        if ctx.author.id in BANNED_USERS:
+            raise UserBanned()
+        return True
+
+    @client.tree.interaction_check
+    async def globally_block_banned_interactions(interaction: discord.Interaction):
+        if interaction.user.id in BANNED_USERS:
+            return False
+        return True
+
     @client.event
     async def on_ready():
         print(f'the bird has awoken as {client.user}')
@@ -15,6 +32,8 @@ def setup(client: commands.Bot):
     @client.listen('on_message')
     async def on_message(message: discord.Message):
         if message.author == client.user:
+            return
+        if message.author.id in {924850244435460136, 1205487376105734184}:
             return
             
         if "67" in message.content:
@@ -43,6 +62,8 @@ def setup(client: commands.Bot):
 
     @client.event
     async def on_command_error(ctx: commands.Context, error):
+        if isinstance(error, UserBanned):
+            return
         if isinstance(error, (commands.MissingPermissions, commands.CheckFailure)):
             await ctx.reply("you don't have permission to do that", ephemeral=True)
         elif isinstance(error, commands.CommandOnCooldown):
