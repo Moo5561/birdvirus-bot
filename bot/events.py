@@ -1,13 +1,32 @@
 import discord
 import random
+import asyncio
 import discord.ext.commands as commands
+import bot.db as db
 
-BANNED_USERS = {924850244435460136, 1205487376105734184}
+BANNED_USERS = set()
 
 class UserBanned(commands.CheckFailure):
     pass
 
 def setup(client: commands.Bot):
+    @client.event
+    async def on_ready():
+        global BANNED_USERS
+        BANNED_USERS = await asyncio.to_thread(db.get_banned_users)
+        # Add the initial hardbanned users to db if not there
+        for uid in [924850244435460136, 1205487376105734184]:
+            if uid not in BANNED_USERS:
+                await asyncio.to_thread(db.ban_user, uid)
+                BANNED_USERS.add(uid)
+        
+        print(f'the bird has awoken as {client.user}')
+        try:
+            synced = await client.tree.sync()
+            print(f"synced {len(synced)} command(s) with discord")
+        except Exception as e:
+            print(f"error syncing command tree: {e}")
+
     @client.check
     async def globally_block_banned(ctx):
         if ctx.author.id in BANNED_USERS:
@@ -20,20 +39,11 @@ def setup(client: commands.Bot):
             return False
         return True
 
-    @client.event
-    async def on_ready():
-        print(f'the bird has awoken as {client.user}')
-        try:
-            synced = await client.tree.sync()
-            print(f"synced {len(synced)} command(s) with discord")
-        except Exception as e:
-            print(f"error syncing command tree: {e}")
-
     @client.listen('on_message')
     async def on_message(message: discord.Message):
         if message.author == client.user:
             return
-        if message.author.id in {924850244435460136, 1205487376105734184}:
+        if message.author.id in BANNED_USERS:
             return
             
         if "67" in message.content:

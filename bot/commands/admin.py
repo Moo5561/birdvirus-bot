@@ -8,6 +8,27 @@ import os
 from bot.commands import is_admin
 
 def setup_admin(client: commands.Bot):
+    # Ban Commands
+    @client.hybrid_command(name="ban", description="ban a user from using the bot (admin only)")
+    @is_admin()
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(user="the user to ban")
+    async def ban_cmd(ctx: commands.Context, user: discord.Member):
+        import bot.events
+        await asyncio.to_thread(db.ban_user, user.id)
+        bot.events.BANNED_USERS.add(user.id)
+        await ctx.reply(f"{user.mention} has been banned from using the bot.")
+
+    @client.hybrid_command(name="unban", description="unban a user from using the bot (admin only)")
+    @is_admin()
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(user="the user to unban")
+    async def unban_cmd(ctx: commands.Context, user: discord.Member):
+        import bot.events
+        await asyncio.to_thread(db.unban_user, user.id)
+        bot.events.BANNED_USERS.discard(user.id)
+        await ctx.reply(f"{user.mention} has been unbanned from using the bot.")
+
     # View Group
     @client.hybrid_group(name="view", description="view logs and other data")
     @is_admin()

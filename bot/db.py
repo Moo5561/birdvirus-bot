@@ -52,8 +52,50 @@ def init_db():
         )
     """)
     
+    # user jobs table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_jobs (
+            user_id INTEGER PRIMARY KEY,
+            job_name TEXT,
+            job_xp INTEGER DEFAULT 0,
+            job_level INTEGER DEFAULT 1,
+            shifts_completed INTEGER DEFAULT 0,
+            last_work_time TEXT
+        )
+    """)
+    
+    # banned users table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS banned_users (
+            user_id INTEGER PRIMARY KEY
+        )
+    """)
+    
     conn.commit()
     conn.close()
+
+# Ban Functions
+def ban_user(user_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR IGNORE INTO banned_users (user_id) VALUES (?)", (user_id,))
+    conn.commit()
+    conn.close()
+
+def unban_user(user_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM banned_users WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+def get_banned_users() -> set:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM banned_users")
+    rows = cursor.fetchall()
+    conn.close()
+    return {row[0] for row in rows}
 
 # Chat Reset Functions
 def set_chat_reset(channel_id: int, reset_at: str):
@@ -219,5 +261,65 @@ def update_property_name(thread_id: int, new_name: str):
     cursor.execute("UPDATE properties SET name = ? WHERE thread_id = ?", (new_name, thread_id))
     conn.commit()
     conn.close()
+
+# Job Functions
+def get_user_job(user_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT job_name, job_xp, job_level, shifts_completed, last_work_time FROM user_jobs WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {"job_name": row[0], "job_xp": row[1], "job_level": row[2], "shifts_completed": row[3], "last_work_time": row[4]}
+    return None
+
+def set_user_job(user_id: int, job_name: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO user_jobs (user_id, job_name, job_xp, job_level, shifts_completed, last_work_time) 
+        VALUES (?, ?, 0, 1, 0, NULL) 
+        ON CONFLICT(user_id) DO UPDATE SET job_name = ?, job_xp = 0, job_level = 1, shifts_completed = 0, last_work_time = NULL
+    """, (user_id, job_name, job_name))
+    conn.commit()
+    conn.close()
+
+def remove_user_job(user_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM user_jobs WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+def update_job_progress(user_id: int, xp_gain: int, time_str: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT job_xp, job_level, shifts_completed FROM user_jobs WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return False, 0
+        
+    current_xp, level, shifts = row
+    new_xp = current_xp + xp_gain
+    shifts += 1
+    
+    level_up = False
+    xp_needed = level * 100
+    if new_xp >= xp_needed:
+        new_xp -= xp_needed
+        level += 1
+        level_up = True
+        
+    cursor.execute("""
+        UPDATE user_jobs 
+        SET job_xp = ?, job_level = ?, shifts_completed = ?, last_work_time = ? 
+        WHERE user_id = ?
+    """, (new_xp, level, shifts, time_str, user_id))
+    
+    conn.commit()
+    conn.close()
+    return level_up, level
 
 init_db()
