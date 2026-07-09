@@ -7,12 +7,36 @@ import bot.db as db
 import os
 from bot.commands import is_admin, is_bot_dev
 
+async def check_if_dev(user_id):
+    AUTHORIZED_USERS = [
+        1048423590623727686, 1278489064210956378, 1421940246492352612, 
+        1246945967102623755, 1488967988207157308, 274556515061465088, 
+        983544114635235430, 1100425178359533691
+    ]
+    if user_id in AUTHORIZED_USERS:
+        return True
+        
+    admin_ids_str = await asyncio.to_thread(db.get_config, "admin_ids")
+    if admin_ids_str:
+        try:
+            admin_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip()]
+            if user_id in admin_ids:
+                return True
+        except Exception:
+            pass
+            
+    return False
+
 def setup_admin(client: commands.Bot):
     # Ban Commands
     @client.hybrid_command(name="ban", description="ban a user from using the bot (bot devs only)")
     @is_bot_dev()
     @app_commands.describe(user="the user to ban")
     async def ban_cmd(ctx: commands.Context, user: discord.Member):
+        if await check_if_dev(user.id):
+            await ctx.reply("you cannot ban another bot developer.", ephemeral=True)
+            return
+            
         import bot.events
         await asyncio.to_thread(db.ban_user, user.id)
         bot.events.BANNED_USERS.add(user.id)
