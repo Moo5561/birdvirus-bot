@@ -5,6 +5,7 @@ import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
 from datetime import datetime, timedelta
+from typing import Literal
 
 JOBS = {
     "janitor": {
@@ -629,7 +630,7 @@ def setup_job(client: commands.Bot):
 
     @job_group.command(name="apply", description="apply for a job")
     @app_commands.describe(job_name="the name of the job you want")
-    async def job_apply(ctx: commands.Context, job_name: str):
+    async def job_apply(ctx: commands.Context, job_name: Literal["janitor", "chef", "developer", "hacker", "miner", "thief"]):
         job_name = job_name.lower()
         if job_name not in JOBS:
             await ctx.reply(f"invalid job. use `/job list` to see available jobs.")
