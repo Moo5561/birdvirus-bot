@@ -23,9 +23,16 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS economy (
             user_id INTEGER PRIMARY KEY,
-            balance INTEGER DEFAULT 100
+            balance INTEGER DEFAULT 100,
+            bank INTEGER DEFAULT 0
         )
     """)
+    
+    # add bank column to existing dbs
+    try:
+        cursor.execute("ALTER TABLE economy ADD COLUMN bank INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     
     # config table
     cursor.execute("""
