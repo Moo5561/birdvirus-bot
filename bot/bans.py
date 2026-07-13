@@ -2,7 +2,7 @@ import os
 import asyncio
 from typing import Set
 
-BAN_FILE = "banned_users.txt"
+BAN_FILE = "bot/banned_users.txt"
 
 
 def _ensure_file():
