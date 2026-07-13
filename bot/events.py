@@ -13,20 +13,6 @@ class UserBanned(commands.CheckFailure):
 def setup(client: commands.Bot):
     @client.event
     async def on_ready():
-        # ensure hardbanned ids exist in the ban file
-        hardbans = [924850244435460136, 1205487376105734184, 1494758877898477690, 1316825719820779576, 1318032136976072744, 1208819266338553957]
-        try:
-            banned_file_set = await bans.read_banned_users()
-        except Exception:
-            banned_file_set = set()
-
-        for uid in hardbans:
-            if uid not in banned_file_set:
-                try:
-                    await bans.add_ban(uid)
-                except Exception:
-                    pass
-
         print(f'the bird has awoken as {client.user}')
         try:
             synced = await client.tree.sync()
