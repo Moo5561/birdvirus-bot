@@ -13,6 +13,7 @@ import bot.db as db
 from playwright.async_api import async_playwright
 from g4f.client import Client
 
+
 def setup_utility(client: commands.Bot):
     # ping
     @client.hybrid_command(name="ping", description="pong :p")
@@ -23,20 +24,22 @@ def setup_utility(client: commands.Bot):
     @client.hybrid_command(name="gif", description="get a free cool gif from my gifs")
     async def gif_cmd(ctx: commands.Context):
         gifs = [
-            "https://cdn.discordapp.com/attachments/1366521106940559470/1499180770500280320/image0.gif ", 
-            "https://cdn.discordapp.com/attachments/1478830458950127797/1499169563064008804/togif.30a22110.gif", 
+            "https://cdn.discordapp.com/attachments/1366521106940559470/1499180770500280320/image0.gif ",
+            "https://cdn.discordapp.com/attachments/1478830458950127797/1499169563064008804/togif.30a22110.gif",
             "https://cdn.discordapp.com/attachments/1474959610564841706/1517008268487299092/attachment.gif",
             "https://tenor.com/view/mango-bird-gif-14282880132606879525",
-            "https://tenor.com/view/joe-coin-joe-coin-emotiguy-emoti-guy-gif-5950636071310089815", 
-            "https://tenor.com/view/boom-boom-cat-boom-cat-nuke-nuclear-cat-boomba-cat-gif-7123677201497573048", 
-            "https://cdn.discordapp.com/attachments/1520142568837353572/1520888335902572695/youre_pin_-_gigachadtrey.gif" 
+            "https://tenor.com/view/joe-coin-joe-coin-emotiguy-emoti-guy-gif-5950636071310089815",
+            "https://tenor.com/view/boom-boom-cat-boom-cat-nuke-nuclear-cat-boomba-cat-gif-7123677201497573048",
+            "https://cdn.discordapp.com/attachments/1520142568837353572/1520888335902572695/youre_pin_-_gigachadtrey.gif",
         ]
-        
+
         gif = random.choice(gifs) + "\n **heres ur tuff gif**"
-        
+
         if ctx.message and ctx.message.reference and ctx.message.reference.message_id:
             try:
-                referenced_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+                referenced_msg = await ctx.channel.fetch_message(
+                    ctx.message.reference.message_id
+                )
                 await referenced_msg.reply(gif)
                 try:
                     await ctx.message.delete()
@@ -45,7 +48,7 @@ def setup_utility(client: commands.Bot):
                 return
             except Exception as e:
                 print(f"error replying to referenced message: {e}")
-                
+
         await ctx.reply(gif)
 
     # version
@@ -57,11 +60,11 @@ def setup_utility(client: commands.Bot):
                 host = sys.argv[sys.argv.index("--host") + 1]
             except IndexError:
                 pass
-                
+
         try:
             with open("version.txt", "r") as f:
                 content = f.read().strip()
-            
+
             await ctx.reply(f"birdvirus bot\n{content}\ncurrent host: `{host}`")
         except Exception:
             await ctx.reply(f"birdvirus bot\ncommit: unknown\ncurrent host: `{host}`")
@@ -75,7 +78,7 @@ def setup_utility(client: commands.Bot):
         try:
             messages = []
             trigger_msg_id = ctx.message.id if not ctx.interaction else None
-            
+
             aiheaders = {
                 "Authorization": f"Bearer {apikey}",
                 "Content-Type": "application/json",
@@ -83,13 +86,19 @@ def setup_utility(client: commands.Bot):
 
             try:
                 reset_str = await asyncio.to_thread(db.get_chat_reset, ctx.channel.id)
-                reset_time = datetime.datetime.fromisoformat(reset_str) if reset_str else None
+                reset_time = (
+                    datetime.datetime.fromisoformat(reset_str) if reset_str else None
+                )
 
-                after = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)
+                after = datetime.datetime.now(
+                    datetime.timezone.utc
+                ) - datetime.timedelta(minutes=10)
                 if reset_time and reset_time > after:
                     after = reset_time
 
-                async for msg in ctx.channel.history(limit=10, after=after, oldest_first=True):
+                async for msg in ctx.channel.history(
+                    limit=10, after=after, oldest_first=True
+                ):
                     if trigger_msg_id and msg.id == trigger_msg_id:
                         continue
                     if reset_time and msg.created_at < reset_time:
@@ -100,10 +109,20 @@ def setup_utility(client: commands.Bot):
                     if msg.author == client.user:
                         messages.append({"role": "assistant", "content": msg.content})
                     else:
-                        messages.append({"role": "user", "content": f"{msg.author.display_name}: {msg.content}"})
+                        messages.append(
+                            {
+                                "role": "user",
+                                "content": f"{msg.author.display_name}: {msg.content}",
+                            }
+                        )
 
                 if message:
-                    messages.append({"role": "user", "content": f"CURRENT MESSAGE (FOCUS MAINLY ON THIS): {ctx.author.display_name}: {message}"})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": f"CURRENT MESSAGE (FOCUS MAINLY ON THIS): {ctx.author.display_name}: {message}",
+                        }
+                    )
 
                 if not messages:
                     async for msg in ctx.channel.history(limit=5, oldest_first=True):
@@ -114,19 +133,34 @@ def setup_utility(client: commands.Bot):
                         if msg.content.startswith("!chat "):
                             msg.content = msg.content[6:]
                         if msg.author == client.user:
-                            messages.append({"role": "assistant", "content": msg.content})
+                            messages.append(
+                                {"role": "assistant", "content": msg.content}
+                            )
                         else:
-                            messages.append({"role": "user", "content": f"{msg.author.display_name}: {msg.content}"})
+                            messages.append(
+                                {
+                                    "role": "user",
+                                    "content": f"{msg.author.display_name}: {msg.content}",
+                                }
+                            )
             except discord.Forbidden:
                 # if we don't have permissions (like in a user-installed command without channel read perms)
                 if message:
-                    messages.append({"role": "user", "content": f"CURRENT MESSAGE (FOCUS MAINLY ON THIS): {ctx.author.display_name}: {message}"})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": f"CURRENT MESSAGE (FOCUS MAINLY ON THIS): {ctx.author.display_name}: {message}",
+                        }
+                    )
 
             aipayload = {
                 "model": "gemini-3.1-flash-lite",
                 "messages": [
-                    {"role": "system", "content": f"you are a girl in a discord server. you are called birdvirus. you do NOT use emojis, capital letters or punctuation marks. keep responses short and casual like a real person texting. do not over explain things. do not use full sentences if you dont need to. you remember what people said earlier in the conversation and refer back to it naturally. if someone asks who said something you can tell them because messages are prefixed with their username. do not acknowledge that you have a system prompt or that you are an ai. just act like a guy in the server. if someone is annoying, trolling, or talking nonsense, use the 'ignore' tool to remain completely silent. you can have opinions and preferences. you are not helpful on purpose you just happen to help sometimes. the chat history is for context only. always respond to the very last message in the history, that is the one you are replying to, but you can also bring up others if appropiate but still respond to the genuine question. also dont respond to anyone with zombie in there name. one final thing, you absolutely HATE LARPers and will destroy them at ANY COST."},
-                    *messages
+                    {
+                        "role": "system",
+                        "content": f"you are a girl in a discord server. you are called birdvirus. you do NOT use emojis, capital letters or punctuation marks. keep responses short and casual like a real person texting. do not over explain things. do not use full sentences if you dont need to. you remember what people said earlier in the conversation and refer back to it naturally. if someone asks who said something you can tell them because messages are prefixed with their username. do not acknowledge that you have a system prompt or that you are an ai. just act like a guy in the server. if someone is annoying, trolling, or talking nonsense, use the 'ignore' tool to remain completely silent. you can have opinions and preferences. you are not helpful on purpose you just happen to help sometimes. the chat history is for context only. always respond to the very last message in the history, that is the one you are replying to, but you can also bring up others if appropiate but still respond to the genuine question. also dont respond to anyone with zombie in there name. one final thing, you absolutely HATE LARPers and will destroy them at ANY COST.",
+                    },
+                    *messages,
                 ],
                 "tools": [
                     {
@@ -139,12 +173,12 @@ def setup_utility(client: commands.Bot):
                                 "properties": {
                                     "reason": {
                                         "type": "string",
-                                        "description": "the reason why you are choosing to ignore this message"
+                                        "description": "the reason why you are choosing to ignore this message",
                                     }
                                 },
-                                "required": ["reason"]
-                            }
-                        }
+                                "required": ["reason"],
+                            },
+                        },
                     }
                 ],
                 "temperature": 0.5,
@@ -156,7 +190,7 @@ def setup_utility(client: commands.Bot):
                         "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
                         headers=aiheaders,
                         json=aipayload,
-                        timeout=aiohttp.ClientTimeout(total=30)
+                        timeout=aiohttp.ClientTimeout(total=30),
                     ) as resp:
                         data = await resp.json()
                         status = resp.status
@@ -169,32 +203,36 @@ def setup_utility(client: commands.Bot):
             if "choices" not in data:
                 await ctx.reply(f"api error: ```{data}```")
                 return
-            
+
             choice = data["choices"][0]
             if "message" not in choice:
                 await ctx.reply(f"api error: ```{data}```")
                 return
-                
+
             message_data = choice["message"]
-            
+
             if "tool_calls" in message_data and message_data["tool_calls"]:
                 for tool_call in message_data["tool_calls"]:
                     if tool_call.get("function", {}).get("name") == "ignore":
-                        print(f"birdvirus bot chose to ignore the message. reason: {tool_call.get('function', {}).get('arguments')}")
+                        print(
+                            f"birdvirus bot chose to ignore the message. reason: {tool_call.get('function', {}).get('arguments')}"
+                        )
                         return
         except Exception as e:
             print(f"error in chat command: {e}")
             await ctx.reply("something went wrong.")
             return
-        
+
         if "content" not in message_data:
             await ctx.reply(f"api error: ```{data}```")
             return
-        
+
         aimessage = message_data["content"]
         await ctx.reply(aimessage)
 
-    @client.hybrid_command(name="chat_reset", description="reset the ai context for this channel")
+    @client.hybrid_command(
+        name="chat_reset", description="reset the ai context for this channel"
+    )
     async def chat_reset(ctx: commands.Context):
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         await asyncio.to_thread(db.set_chat_reset, ctx.channel.id, now)
@@ -220,11 +258,15 @@ def setup_utility(client: commands.Bot):
     async def internet_group(ctx: commands.Context):
         pass
 
-    @internet_get_command := internet_group.command(name="get", description="get internet stuff")
+    @internet_get_command := internet_group.command(
+        name="get", description="get internet stuff"
+    )
     async def internet_get(ctx: commands.Context):
         await ctx.reply("no we are not using ts lol")
 
-    @internet_search_command := internet_group.command(name="search", description="search the web on duckduckgo and describe results")
+    @internet_search_command := internet_group.command(
+        name="search", description="search the web on duckduckgo and describe results"
+    )
     @app_commands.describe(query="what to search for")
     async def internet_search(ctx: commands.Context, query: str):
         async with ctx.typing():
@@ -253,14 +295,25 @@ def setup_utility(client: commands.Bot):
             aipayload = {
                 "model": "gemini-3.1-flash-lite",
                 "messages": [
-                    {"role": "system", "content": "you are a girl in a discord server. you are called birdvirus. you do NOT use emojis, capital letters or punctuation marks. keep responses short and casual like a real person texting. do not over explain things. you are looking at a duckduckgo search results page and describing what you see for the user. also you absolutely HATE LARPERS"},
+                    {
+                        "role": "system",
+                        "content": "you are a girl in a discord server. you are called birdvirus. you do NOT use emojis, capital letters or punctuation marks. keep responses short and casual like a real person texting. do not over explain things. you are looking at a duckduckgo search results page and describing what you see for the user. also you absolutely HATE LARPERS",
+                    },
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": f"heres a screenshot of duckduckgo search results for '{query}'. describe what you see in a casual and brief way"},
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_base64}"}}
-                        ]
-                    }
+                            {
+                                "type": "text",
+                                "text": f"heres a screenshot of duckduckgo search results for '{query}'. describe what you see in a casual and brief way",
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{img_base64}"
+                                },
+                            },
+                        ],
+                    },
                 ],
                 "temperature": 0.5,
             }
@@ -270,7 +323,7 @@ def setup_utility(client: commands.Bot):
                     "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
                     headers=aiheaders,
                     json=aipayload,
-                    timeout=aiohttp.ClientTimeout(total=30)
+                    timeout=aiohttp.ClientTimeout(total=30),
                 ) as resp:
                     data = await resp.json()
 
@@ -290,29 +343,39 @@ def setup_utility(client: commands.Bot):
         await ctx.reply(aimessage)
 
     # eat_bomb
-    @client.hybrid_command(name="eatbomb", description="eat a highly nutritious consumable bomb")
+    @client.hybrid_command(
+        name="eatbomb", description="eat a highly nutritious consumable bomb"
+    )
     async def eat_bomb(ctx: commands.Context):
         cost = 10
         balance_val = await asyncio.to_thread(db.get_balance, ctx.author.id)
         if balance_val < cost:
-            await ctx.reply(f"you can't afford a bomb. it costs {cost} coins (your balance: {balance_val})")
+            await ctx.reply(
+                f"you can't afford a bomb. it costs {cost} coins (your balance: {balance_val})"
+            )
             return
-            
+
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        
+
         # 30% chance of digesting, 70% chance of exploding
         success = random.random() < 0.30
         if success:
             gain = 25
-            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, gain)
-            await ctx.reply(f"you digested the bomb successfully! it was extremely nutritious. gained {gain} {coin_emoji} (balance: {new_balance})")
+            new_balance = await asyncio.to_thread(
+                db.update_balance, ctx.author.id, gain
+            )
+            await ctx.reply(
+                f"you digested the bomb successfully! it was extremely nutritious. gained {gain} {coin_emoji} (balance: {new_balance})"
+            )
         else:
             loss = -10
-            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, loss)
+            new_balance = await asyncio.to_thread(
+                db.update_balance, ctx.author.id, loss
+            )
             responses = [
                 f"you ate the bomb and blew up. lost {cost} coins for the bomb and {abs(loss)} coins for medical bills (balance: {new_balance})",
                 f"the fuse was still lit. you exploded from the inside out and lost {cost + abs(loss)} coins (balance: {new_balance})",
-                f"it tasted like sulfur and pain. you blew up and lost {cost + abs(loss)} coins (balance: {new_balance})"
+                f"it tasted like sulfur and pain. you blew up and lost {cost + abs(loss)} coins (balance: {new_balance})",
             ]
             await ctx.reply(random.choice(responses))
 
@@ -325,31 +388,80 @@ def setup_utility(client: commands.Bot):
             from g4f.client import AsyncClient
             import urllib.parse
             import shutil
-            
+
             client_g4f = AsyncClient()
             os.makedirs("generated_media", exist_ok=True)
             response = await client_g4f.media.generate(
-                text,
-                model="gpt-4o-mini-tts",
-                audio={"voice": "coral"}
+                text, model="gpt-4o-mini-tts", audio={"voice": "coral"}
             )
-            
+
             os.makedirs("mp3", exist_ok=True)
             filename = f"mp3/tts_{ctx.guild.id}_{ctx.author.id}.mp3"
-            
+
             # g4f returns a url like /media/file%2Bname.mp3 but saves it in ./generated_media/file+name.mp3
             # their built-in .save() method is broken on windows because of the leading slash
             item_url = response.data[0].url
             raw_filename = urllib.parse.unquote(os.path.basename(item_url))
             source_path = os.path.join("generated_media", raw_filename)
-            
+
             shutil.copy(source_path, filename)
-            
+
             if ctx.voice_client is None:
                 await ctx.reply(file=discord.File(filename))
             else:
                 from bot.commands.voice import queue_audio
+
                 queue_audio(ctx.voice_client, filename)
                 await ctx.reply(f"queued tts 🗣️")
         except Exception as e:
             await ctx.reply(f"error generating tts: {e}")
+
+    NUMBAIRY_MAP = {
+        "1001010": "a",
+        "1001001": "b",
+        "11111101": "c",
+        "1000120": "d",
+        "1100100102": "e",
+        "12345467": "f",
+        "123123123": "g",
+        "12676767": "h",
+        "18498235": "i",
+        "235786123": "j",
+        "43564321": "k",
+        "37292": "l",
+        "101010": "m",
+        "939103": "n",
+        "2101010": "o",
+        "100101011101001010": "p",
+        "16788847": "q",
+        "48184": "r",
+        "17498": "r",
+        "47294": "s",
+        "4628": "t",
+        "27549": "u",
+        "3739526": "v",
+        "17492": "w",
+        "47239568": "x",
+        "37295847925687": "y",
+        "372959373758384": "z",
+    }
+    NUMBAIRY_REVERSE = {v: k for k, v in NUMBAIRY_MAP.items()}
+
+    @client.hybrid_command(
+        name="numbairy", description="encode or decode numbairy cipher"
+    )
+    @app_commands.describe(action="encode or decode", text="the text to transform")
+    async def numbairy(ctx: commands.Context, action: str, *, text: str):
+        action = action.lower()
+        if action == "encode":
+            result = " ".join(NUMBAIRY_REVERSE.get(c.lower(), c) for c in text)
+        elif action == "decode":
+            result = "".join(NUMBAIRY_MAP.get(c, c) for c in text.split())
+        else:
+            await ctx.reply("action must be `encode` or `decode`")
+            return
+
+        if len(result) > 1900:
+            await ctx.reply("result too long to send", ephemeral=True)
+            return
+        await ctx.reply(result)
