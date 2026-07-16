@@ -417,6 +417,7 @@ def setup_utility(client: commands.Bot):
             await ctx.reply(f"error generating tts: {e}")
 
     NUMBAIRY_MAP = {
+        "16437862583086278": " ",
         "1001010": "a",
         "1001001": "b",
         "11111101": "c",
