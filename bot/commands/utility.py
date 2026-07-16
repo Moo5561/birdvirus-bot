@@ -452,15 +452,19 @@ def setup_utility(client: commands.Bot):
         name="numbairy", description="encode or decode numbairy cipher"
     )
     @app_commands.describe(action="encode or decode", text="the text to transform")
-    async def numbairy(ctx: commands.Context, action: str, *, text: str):
-        action = action.lower()
-        if action == "encode":
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="encode", value="encode"),
+            app_commands.Choice(name="decode", value="decode"),
+        ]
+    )
+    async def numbairy(
+        ctx: commands.Context, action: app_commands.Choice[str], *, text: str
+    ):
+        if action.value == "encode":
             result = " ".join(NUMBAIRY_REVERSE.get(c.lower(), c) for c in text)
-        elif action == "decode":
-            result = "".join(NUMBAIRY_MAP.get(c, c) for c in text.split())
         else:
-            await ctx.reply("action must be `encode` or `decode`")
-            return
+            result = "".join(NUMBAIRY_MAP.get(c, c) for c in text.split())
 
         if len(result) > 1900:
             await ctx.reply("result too long to send", ephemeral=True)
