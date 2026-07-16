@@ -10,28 +10,34 @@ from bot.config import token
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("bot.log", mode='w'),
-        logging.StreamHandler()
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler("bot.log", mode="w"), logging.StreamHandler()],
 )
 
 parser = argparse.ArgumentParser(description="run the birdvirus bot")
 parser.add_argument("--host", required=True, help="who is hosting the bot currently")
 args = parser.parse_args()
 
+
 def get_prefix(bot, message):
     if bot.user and bot.user.id == 1522117141090799697:
         return "ht!"
     return "%"
 
+
 intents = discord.Intents.default()
 intents.message_content = True
 client = commands.Bot(
-    command_prefix=get_prefix, 
+    command_prefix=get_prefix,
     intents=intents,
-    activity=discord.CustomActivity(name=f"hosted by {args.host}")
+    activity=discord.CustomActivity(name=f"hosted by {args.host}"),
+)
+
+client.tree.default_allowed_contexts = discord.app_commands.AppCommandContext(
+    guild=True, dm_channel=True, private_channel=True
+)
+client.tree.default_allowed_installs = discord.app_commands.AppInstallationType(
+    guild=True, user=True
 )
 
 bot.events.setup(client)
