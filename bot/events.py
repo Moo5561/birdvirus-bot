@@ -18,7 +18,7 @@ class UserBanned(commands.CheckFailure):
 def setup(client: commands.Bot):
     @client.event
     async def on_ready():
-        if client.shard_id != 0:
+        if client.shard_id is not None and client.shard_id != 0:
             return
 
         if os.path.exists(SNAPSHOT_FILE):
