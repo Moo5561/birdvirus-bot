@@ -5,6 +5,7 @@ import random
 import sys
 import asyncio
 import os
+import time
 import subprocess
 import discord
 import discord.ext.commands as commands
@@ -47,12 +48,70 @@ def setup_utility(client: commands.Bot):
         if len(output) > 1900:
             output = output[:1900] + "..."
 
-        await ctx.reply(f"```\n{output}\n```", ephemeral=True)
+        if ctx.interaction:
+            await ctx.reply(f"```\n{output}\n```", ephemeral=True)
+        else:
+            try:
+                dm = ctx.author.dm_channel or await ctx.author.create_dm()
+                await dm.send(f"```\n{output}\n```")
+                try:
+                    await ctx.message.add_reaction("📬")
+                except:
+                    pass
+            except:
+                await ctx.reply(f"```\n{output}\n```")
 
     # ping
-    @client.hybrid_command(name="ping", description="pong :p")
+    @client.hybrid_command(
+        name="ping", description="check bot latency and response times"
+    )
     async def ping_cmd(ctx: commands.Context):
-        await ctx.reply("pong :p")
+        ws_latency = round(client.latency * 1000)
+
+        before = time.time()
+        msg = await ctx.reply("pong :p")
+        roundtrip = round((time.time() - before) * 1000)
+
+        uptime_delta = datetime.datetime.now(datetime.timezone.utc) - client.start_time
+        total_seconds = int(uptime_delta.total_seconds())
+        days, remainder = divmod(total_seconds, 86400)
+        hours, remainder = divmod(remainder, 3600)
+        minutes, seconds = divmod(remainder, 60)
+
+        shard_info = ""
+        if client.shard_count and client.shard_count > 1:
+            shard_info = f"\nshards: {client.shard_count} | shard id: {ctx.guild.shard_id if ctx.guild else 'n/a'}"
+
+        uptime_str = f"{days}d {hours}h {minutes}m {seconds}s"
+
+        bar_len = 20
+        ws_fill = min(int(bar_len * (1 - min(ws_latency / 500, 1))), bar_len)
+        ws_bar = "🟩" * ws_fill + "🟥" * (bar_len - ws_fill)
+
+        rt_fill = min(int(bar_len * (1 - min(roundtrip / 1000, 1))), bar_len)
+        rt_bar = "🟩" * rt_fill + "🟥" * (bar_len - rt_fill)
+
+        diagram = (
+            f"```\n"
+            f"  you                discord               bot\n"
+            f"   │                    │                    │\n"
+            f"   │ ──── ping ────────>│──── ws ───────────>│\n"
+            f"   │                    │                    │\n"
+            f"   │<── pong ──────────│<── ack ────────────│\n"
+            f"   │                    │                    │\n"
+            f"```\n"
+        )
+
+        await msg.edit(
+            content=(
+                f"{diagram}"
+                f"ws latency: `{ws_latency}ms`\n"
+                f"{ws_bar}\n"
+                f"roundtrip: `{roundtrip}ms`\n"
+                f"{rt_bar}\n"
+                f"uptime: `{uptime_str}`{shard_info}"
+            )
+        )
 
     # gif
     @client.hybrid_command(name="gif", description="get a free cool gif from my gifs")

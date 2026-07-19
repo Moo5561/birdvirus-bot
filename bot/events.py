@@ -21,6 +21,9 @@ def setup(client: commands.Bot):
         if client.shard_id is not None and client.shard_id != 0:
             return
 
+        if not hasattr(client, "start_time"):
+            client.start_time = discord.utils.utcnow()
+
         if os.path.exists(SNAPSHOT_FILE):
             with open(SNAPSHOT_FILE) as f:
                 snapshot_head = f.read().strip()
