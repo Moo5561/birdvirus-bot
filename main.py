@@ -30,8 +30,9 @@ intents.message_content = True
 client = commands.AutoShardedBot(
     command_prefix=get_prefix,
     intents=intents,
-    activity=discord.CustomActivity(name=f"% • hosted by {args.host}"),
+    activity=discord.CustomActivity(name=f"loading..."),
 )
+client._host = args.host
 
 client.tree.default_allowed_contexts = discord.app_commands.AppCommandContext(
     guild=True, dm_channel=True, private_channel=True

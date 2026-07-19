@@ -36,6 +36,11 @@ def setup(client: commands.Bot):
             print("reverted. restarting with original args...")
             os.execv(sys.executable, [sys.executable] + sys.argv)
 
+        prefix = "ht!" if client.user and client.user.id == 1522117141090799697 else "%"
+        await client.change_presence(
+            activity=discord.CustomActivity(name=f"{prefix} • hosted by {client._host}")
+        )
+
         print(f"the bird has awoken as {client.user}")
         try:
             synced = await client.tree.sync()
