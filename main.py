@@ -27,7 +27,7 @@ def get_prefix(bot, message):
 
 intents = discord.Intents.default()
 intents.message_content = True
-client = commands.Bot(
+client = commands.AutoShardedBot(
     command_prefix=get_prefix,
     intents=intents,
     activity=discord.CustomActivity(name=f"hosted by {args.host}"),

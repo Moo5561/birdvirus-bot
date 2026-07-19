@@ -1,9 +1,14 @@
 import discord
 import random
 import asyncio
+import os
+import sys
+import subprocess
 import discord.ext.commands as commands
 import bot.db as db
 import bot.bans as bans
+
+SNAPSHOT_FILE = "update_snapshot.txt"
 
 
 class UserBanned(commands.CheckFailure):
@@ -13,7 +18,25 @@ class UserBanned(commands.CheckFailure):
 def setup(client: commands.Bot):
     @client.event
     async def on_ready():
-        print(f'the bird has awoken as {client.user}')
+        if client.shard_id != 0:
+            return
+
+        if os.path.exists(SNAPSHOT_FILE):
+            with open(SNAPSHOT_FILE) as f:
+                snapshot_head = f.read().strip()
+            print(
+                f"update snapshot found ({snapshot_head[:8]}), bot may have crashed during update. reverting..."
+            )
+            subprocess.run(
+                ["git", "reset", "--hard", snapshot_head],
+                capture_output=True,
+                timeout=30,
+            )
+            os.remove(SNAPSHOT_FILE)
+            print("reverted. restarting with original args...")
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+
+        print(f"the bird has awoken as {client.user}")
         try:
             synced = await client.tree.sync()
             print(f"synced {len(synced)} command(s) with discord")
@@ -40,7 +63,7 @@ def setup(client: commands.Bot):
             return False
         return True
 
-    @client.listen('on_message')
+    @client.listen("on_message")
     async def on_message(message: discord.Message):
         if message.author == client.user:
             return
@@ -62,17 +85,30 @@ def setup(client: commands.Bot):
                 if vc.is_connected():
                     try:
                         from bot.commands import audio_queues
+
                         guild_id = vc.guild.id
-                        source = "mp3/birdvirus.mp3" if random.random() < 0.50 else "mp3/bird.mp3"
+                        source = (
+                            "mp3/birdvirus.mp3"
+                            if random.random() < 0.50
+                            else "mp3/bird.mp3"
+                        )
 
                         if not vc.is_playing():
+
                             def play_next(error, vc_ref, g_id):
-                                if error: print(f"player error: {error}")
+                                if error:
+                                    print(f"player error: {error}")
                                 if g_id in audio_queues and len(audio_queues[g_id]) > 0:
                                     src = audio_queues[g_id].pop(0)
-                                    vc_ref.play(discord.FFmpegPCMAudio(src), after=lambda e: play_next(e, vc_ref, g_id))
+                                    vc_ref.play(
+                                        discord.FFmpegPCMAudio(src),
+                                        after=lambda e: play_next(e, vc_ref, g_id),
+                                    )
 
-                            vc.play(discord.FFmpegPCMAudio(source), after=lambda e: play_next(e, vc, guild_id))
+                            vc.play(
+                                discord.FFmpegPCMAudio(source),
+                                after=lambda e: play_next(e, vc, guild_id),
+                            )
                         else:
                             if guild_id not in audio_queues:
                                 audio_queues[guild_id] = []
@@ -87,6 +123,8 @@ def setup(client: commands.Bot):
         if isinstance(error, (commands.MissingPermissions, commands.CheckFailure)):
             await ctx.reply("you don't have permission to do that", ephemeral=True)
         elif isinstance(error, commands.CommandOnCooldown):
-            await ctx.reply(f"slow down dude wait {error.retry_after:.1f} seconds", ephemeral=True)
+            await ctx.reply(
+                f"slow down dude wait {error.retry_after:.1f} seconds", ephemeral=True
+            )
         else:
             print(f"command error: {error}")
