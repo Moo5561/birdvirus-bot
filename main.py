@@ -3,10 +3,16 @@ import aiohttp
 import datetime
 import argparse
 import logging
+import base64
+import os
 import discord.ext.commands as commands
 import bot.events
 import bot.commands
 from bot.config import token
+
+bot_id = int(base64.b64decode(token.split(".")[0] + "==").decode())
+if bot_id == 1522117141090799697:
+    os.environ["BOT_DB_PATH"] = "birdvirus_nightly.db"
 
 logging.basicConfig(
     level=logging.INFO,
