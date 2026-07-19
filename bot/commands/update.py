@@ -76,7 +76,14 @@ def setup_update(client: commands.Bot):
             os.remove(SNAPSHOT_FILE)
             return
 
-        await ctx.reply(f"git pull done:\n```\n{output[:1500]}```\nchecking syntax...")
+        await ctx.reply(f"git pull done:\n```\n{output[:1500]}```")
+
+        if "Already up to date" in output:
+            os.remove(SNAPSHOT_FILE)
+            await ctx.reply("nothing new to pull.")
+            return
+
+        await ctx.reply("checking syntax...")
 
         ok, err = await asyncio.to_thread(syntax_check)
         if not ok:
