@@ -6,7 +6,6 @@ import sys
 import asyncio
 import os
 import time
-import subprocess
 import discord
 import discord.ext.commands as commands
 from discord import app_commands
@@ -17,50 +16,6 @@ from g4f.client import Client
 
 
 def setup_utility(client: commands.Bot):
-    # run
-    @client.hybrid_command(name="run", description="run a bash command (restricted)")
-    @app_commands.describe(command="the bash command to run")
-    async def run_cmd(ctx: commands.Context, *, command: str):
-        ALLOWED = {1488967988207157308, 1048423590623727686}
-        if ctx.author.id not in ALLOWED:
-            await ctx.reply(
-                "you are not authorized to use this command", ephemeral=True
-            )
-            return
-
-        try:
-            result = await asyncio.to_thread(
-                subprocess.run,
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            output = result.stdout + result.stderr
-            if not output:
-                output = "(no output)"
-        except subprocess.TimeoutExpired:
-            output = "command timed out after 30s"
-        except Exception as e:
-            output = f"error: {e}"
-
-        if len(output) > 1900:
-            output = output[:1900] + "..."
-
-        if ctx.interaction:
-            await ctx.reply(f"```\n{output}\n```", ephemeral=True)
-        else:
-            try:
-                dm = ctx.author.dm_channel or await ctx.author.create_dm()
-                await dm.send(f"```\n{output}\n```")
-                try:
-                    await ctx.message.add_reaction("📬")
-                except:
-                    pass
-            except:
-                await ctx.reply(f"```\n{output}\n```")
-
     # ping
     @client.hybrid_command(
         name="ping", description="check bot latency and response times"
