@@ -115,7 +115,6 @@ def setup_voice(client: commands.Bot):
                 1488967988207157308,
                 274556515061465088,
                 983544114635235430,
-                1100425178359533691,
             ]
             if (
                 ctx.author.id in AUTHORIZED_USERS
