@@ -47,6 +47,19 @@ client.tree.default_allowed_installs = discord.app_commands.AppInstallationType(
     guild=True, user=True
 )
 
+# bots are ignored by default; allow specific bot user ids to run commands
+ALLOWED_BOT_IDS = {1518310857598308433}
+
+
+async def process_commands(message):
+    if message.author.bot and message.author.id not in ALLOWED_BOT_IDS:
+        return
+    ctx = await client.get_context(message)
+    await client.invoke(ctx)
+
+
+client.process_commands = process_commands
+
 bot.events.setup(client)
 bot.commands.setup(client)
 
