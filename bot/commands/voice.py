@@ -12,7 +12,7 @@ last_temp_sources = {}
 
 
 def cleanup_temp(source):
-    if source.startswith("mp3/temp_"):
+    if source and source.startswith("mp3/temp_"):
         try:
             os.remove(source)
         except:
