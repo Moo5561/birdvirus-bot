@@ -24,49 +24,92 @@ def setup_utility(client: commands.Bot):
         ws_latency = round(client.latency * 1000)
 
         before = time.time()
-        msg = await ctx.reply("pong :p")
+        msg = await ctx.reply("🏓 pong!")
         roundtrip = round((time.time() - before) * 1000)
+
+        before_db = time.time()
+        await asyncio.to_thread(db.execute, "SELECT 1")
+        db_latency = round((time.time() - before_db) * 1000)
+
+        before_api = time.time()
+        async with aiohttp.ClientSession() as session:
+            async with session.get("https://discord.com/api/v10/gateway") as resp:
+                await resp.read()
+        api_latency = round((time.time() - before_api) * 1000)
 
         uptime_delta = datetime.datetime.now(datetime.timezone.utc) - client.start_time
         total_seconds = int(uptime_delta.total_seconds())
         days, remainder = divmod(total_seconds, 86400)
         hours, remainder = divmod(remainder, 3600)
         minutes, seconds = divmod(remainder, 60)
+        uptime_str = f"{days}d {hours}h {minutes}m {seconds}s"
 
         shard_info = ""
         if client.shard_count and client.shard_count > 1:
-            shard_info = f"\nshards: {client.shard_count} | shard id: {ctx.guild.shard_id if ctx.guild else 'n/a'}"
+            shard_info = f"\n**shards:** {client.shard_count} | current: {ctx.guild.shard_id if ctx.guild else 'n/a'}"
 
-        uptime_str = f"{days}d {hours}h {minutes}m {seconds}s"
+        def get_status(latency):
+            if latency < 100:
+                return "🟢 excellent"
+            elif latency < 200:
+                return "🟡 good"
+            elif latency < 500:
+                return "🟠 fair"
+            else:
+                return "🔴 poor"
 
-        bar_len = 20
-        ws_fill = min(int(bar_len * (1 - min(ws_latency / 500, 1))), bar_len)
-        ws_bar = "🟩" * ws_fill + "🟥" * (bar_len - ws_fill)
+        bar_len = 15
+        def make_bar(latency, max_val=500):
+            fill = min(int(bar_len * (1 - min(latency / max_val, 1))), bar_len)
+            return "▰" * fill + "▱" * (bar_len - fill)
 
-        rt_fill = min(int(bar_len * (1 - min(roundtrip / 1000, 1))), bar_len)
-        rt_bar = "🟩" * rt_fill + "🟥" * (bar_len - rt_fill)
+        embed = discord.Embed(
+            title="🏓 pong!",
+            color=discord.Color.green() if ws_latency < 200 else discord.Color.orange() if ws_latency < 500 else discord.Color.red()
+        )
+
+        embed.add_field(
+            name="⚡ latency breakdown",
+            value=(
+                f"**websocket:** `{ws_latency}ms` {get_status(ws_latency)}\n"
+                f"`{make_bar(ws_latency)}`\n\n"
+                f"**roundtrip:** `{roundtrip}ms` {get_status(roundtrip)}\n"
+                f"`{make_bar(roundtrip, 1000)}`\n\n"
+                f"**database:** `{db_latency}ms` {get_status(db_latency)}\n"
+                f"`{make_bar(db_latency)}`\n\n"
+                f"**discord api:** `{api_latency}ms` {get_status(api_latency)}\n"
+                f"`{make_bar(api_latency)}"
+            ),
+            inline=False
+        )
+
+        embed.add_field(
+            name="📊 system info",
+            value=(
+                f"**uptime:** `{uptime_str}`\n"
+                f"**guilds:** `{len(client.guilds)}`\n"
+                f"**users:** `{len(client.users)}`\n"
+                f"**python:** `{sys.version.split()[0]}`\n"
+                f"**discord.py:** `{discord.__version__}`{shard_info}"
+            ),
+            inline=False
+        )
 
         diagram = (
-            f"```\n"
-            f"  you                discord               bot\n"
-            f"   │                    │                    │\n"
-            f"   │ ──── ping ────────>│──── ws ───────────>│\n"
-            f"   │                    │                    │\n"
-            f"   │<── pong ──────────│<── ack ────────────│\n"
-            f"   │                    │                    │\n"
-            f"```\n"
+            "```\n"
+            "  you                discord               bot\n"
+            "   │                    │                    │\n"
+            "   │ ──── ping ────────>│──── ws ───────────>│\n"
+            "   │                    │                    │\n"
+            "   │<── pong ──────────│<── ack ────────────│\n"
+            "   │                    │                    │\n"
+            "```"
         )
 
-        await msg.edit(
-            content=(
-                f"{diagram}"
-                f"ws latency: `{ws_latency}ms`\n"
-                f"{ws_bar}\n"
-                f"roundtrip: `{roundtrip}ms`\n"
-                f"{rt_bar}\n"
-                f"uptime: `{uptime_str}`{shard_info}"
-            )
-        )
+        embed.set_footer(text=diagram)
+        embed.timestamp = discord.utils.utcnow()
+
+        await msg.edit(content="", embed=embed)
 
     # gif
     @client.hybrid_command(name="gif", description="get a free cool gif from my gifs")
