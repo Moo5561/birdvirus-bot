@@ -1,1 +1,48 @@
-<!DOCTYPE html><html><title>work in progress</title><body>wip sorry</body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Birdvirus Cloud — a small AI assistant for the Birdvirus Discord community." />
+    <title>Birdvirus Cloud</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="aurora aurora-one" aria-hidden="true"></div>
+    <div class="aurora aurora-two" aria-hidden="true"></div>
+    <main class="shell">
+      <header class="hero">
+        <div class="topbar">
+          <a class="brand" href="../">BIRDVIRUS <span>CLOUD</span></a>
+          <span class="build">AI LABS <b>01</b></span>
+        </div>
+        <p class="eyebrow">Community AI assistant</p>
+        <h1>Ask the flock.</h1>
+        <p class="lede">Birdvirus Cloud is a focused, friendly assistant for ideas, questions, and Discord bot help.</p>
+      </header>
+
+      <section class="chat" aria-label="Birdvirus Cloud chat">
+        <div id="messages" class="messages" aria-live="polite">
+          <article class="message assistant">
+            <p class="message-label">Birdvirus Cloud</p>
+            <p>Hey! I’m ready to help with Birdvirus, Discord bots, or whatever you’re building.</p>
+          </article>
+        </div>
+        <form id="chat-form" class="composer">
+          <label class="sr-only" for="prompt">Your message</label>
+          <textarea id="prompt" name="prompt" rows="2" maxlength="2000" placeholder="Ask Birdvirus Cloud anything…" required></textarea>
+          <div class="composer-bottom">
+            <p>AI can make mistakes. Don’t share passwords or private info.</p>
+            <button id="send" type="submit">Send <span aria-hidden="true">↗</span></button>
+          </div>
+        </form>
+      </section>
+
+      <footer>
+        <span>Birdvirus Cloud</span>
+        <span class="status"><i></i> online</span>
+      </footer>
+    </main>
+    <script src="app.js" defer></script>
+  </body>
+</html>
