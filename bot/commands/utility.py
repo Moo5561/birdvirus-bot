@@ -34,11 +34,23 @@ def setup_utility(client: commands.Bot):
         await asyncio.to_thread(db.execute, "SELECT 1")
         db_latency = round((time.time() - before_db) * 1000)
 
-        before_api = time.time()
-        async with aiohttp.ClientSession() as session:
-            async with session.get("https://discord.com/api/v10/gateway") as resp:
-                await resp.read()
-        api_latency = round((time.time() - before_api) * 1000)
+        async def ping_endpoint(name, url):
+            try:
+                before = time.time()
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                        await resp.read()
+                return name, round((time.time() - before) * 1000)
+            except Exception:
+                return name, -1
+
+        api_checks = await asyncio.gather(
+            ping_endpoint('discord api', 'https://discord.com/api/v10/gateway'),
+            ping_endpoint('gemini', 'https://generativelanguage.googleapis.com/'),
+            ping_endpoint('youtube', 'https://www.youtube.com/'),
+            ping_endpoint('tenor', 'https://tenor.com/'),
+            ping_endpoint('duckduckgo', 'https://duckduckgo.com/'),
+        )
 
         uptime_delta = datetime.datetime.now(datetime.timezone.utc) - client.start_time
         total_seconds = int(uptime_delta.total_seconds())
@@ -55,40 +67,69 @@ def setup_utility(client: commands.Bot):
             'websocket': ws_latency,
             'roundtrip': roundtrip,
             'database': db_latency,
-            'discord api': api_latency
         }
+        for name, latency in api_checks:
+            metrics[name] = latency
 
-        colors = ['#00ff88', '#00aaff', '#ffaa00', '#ff0088']
+        colors = ['#00ff88', '#00aaff', '#ffaa00', '#ff0088', '#aa44ff', '#ff4444', '#44ffaa', '#ffdd44']
         labels = list(metrics.keys())
-        values = list(metrics.values())
+        values = [max(v, 0) for v in metrics.values()]
 
-        fig, ax = plt.subplots(figsize=(10, 6), facecolor='#1a1a1a')
+        fig, ax = plt.subplots(figsize=(12, 6), facecolor='#1a1a1a')
         ax.set_facecolor('#1a1a1a')
 
-        ax.axhspan(0, 100, alpha=0.1, color='#00ff88', label='excellent (<100ms)')
-        ax.axhspan(100, 200, alpha=0.1, color='#ffff00', label='good (100-200ms)')
-        ax.axhspan(200, 500, alpha=0.1, color='#ff8800', label='fair (200-500ms)')
-        ax.axhspan(500, max(max(values) * 1.2, 600), alpha=0.1, color='#ff0000', label='poor (>500ms)')
+        valid_values = [v for v in values if v > 0]
+        y_max = max(max(valid_values) * 1.3, 600) if valid_values else 600
 
-        bars = ax.bar(labels, values, color=colors, alpha=0.8, edgecolor='white', linewidth=2)
+        ax.axhspan(0, 100, alpha=0.08, color='#00ff88')
+        ax.axhspan(100, 200, alpha=0.08, color='#ffff00')
+        ax.axhspan(200, 500, alpha=0.08, color='#ff8800')
+        ax.axhspan(500, y_max, alpha=0.08, color='#ff0000')
 
-        for bar, value in zip(bars, values):
+        zone_labels = [
+            (50, '🟢 excellent', '#00ff88'),
+            (150, '🟡 good', '#ffff00'),
+            (350, '🟠 fair', '#ff8800'),
+            (min(550, y_max - 30), '🔴 poor', '#ff0000'),
+        ]
+        for y, text, color in zone_labels:
+            ax.text(len(labels) - 0.5, y, text, color=color, fontsize=8,
+                    ha='right', va='center', alpha=0.6, fontstyle='italic')
+
+        bars = ax.bar(labels, values, color=colors[:len(labels)], alpha=0.85, edgecolor='white', linewidth=1.5)
+
+        for bar, raw_value in zip(bars, list(metrics.values())):
             height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height,
-                    f'{value}ms',
-                    ha='center', va='bottom', color='white', fontsize=12, fontweight='bold')
+            if raw_value < 0:
+                ax.text(bar.get_x() + bar.get_width()/2., 10,
+                        'FAIL',
+                        ha='center', va='bottom', color='#ff4444', fontsize=11, fontweight='bold')
+                bar.set_color('#ff000044')
+                bar.set_edgecolor('#ff4444')
+            else:
+                ax.text(bar.get_x() + bar.get_width()/2., height,
+                        f'{raw_value}ms',
+                        ha='center', va='bottom', color='white', fontsize=10, fontweight='bold')
 
         ax.set_ylabel('latency (ms)', color='white', fontsize=12, fontweight='bold')
         ax.set_title('🏓 bot latency analysis', color='white', fontsize=16, fontweight='bold', pad=20)
-        ax.tick_params(axis='x', colors='white', labelsize=11)
+        ax.tick_params(axis='x', colors='white', labelsize=9, rotation=25)
         ax.tick_params(axis='y', colors='white', labelsize=10)
         ax.spines['bottom'].set_color('white')
         ax.spines['left'].set_color('white')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
-        ax.grid(axis='y', alpha=0.3, color='white', linestyle='--')
+        ax.grid(axis='y', alpha=0.2, color='white', linestyle='--')
+        ax.set_ylim(0, y_max)
 
-        legend = ax.legend(loc='upper right', facecolor='#1a1a1a', labelcolor='white', fontsize=9)
+        legend_patches = [
+            mpatches.Patch(color='#00ff8833', label='excellent (<100ms)'),
+            mpatches.Patch(color='#ffff0033', label='good (100-200ms)'),
+            mpatches.Patch(color='#ff880033', label='fair (200-500ms)'),
+            mpatches.Patch(color='#ff000033', label='poor (>500ms)'),
+        ]
+        legend = ax.legend(handles=legend_patches, loc='upper left', facecolor='#1a1a1a',
+                           labelcolor='white', fontsize=8)
         legend.get_frame().set_edgecolor('white')
 
         plt.tight_layout()
@@ -103,6 +144,25 @@ def setup_utility(client: commands.Bot):
             color=discord.Color.green() if ws_latency < 200 else discord.Color.orange() if ws_latency < 500 else discord.Color.red()
         )
 
+        api_lines = []
+        for name, latency in api_checks:
+            if latency < 0:
+                api_lines.append(f"🔴 **{name}:** `timeout`")
+            elif latency < 100:
+                api_lines.append(f"🟢 **{name}:** `{latency}ms`")
+            elif latency < 200:
+                api_lines.append(f"🟡 **{name}:** `{latency}ms`")
+            elif latency < 500:
+                api_lines.append(f"🟠 **{name}:** `{latency}ms`")
+            else:
+                api_lines.append(f"🔴 **{name}:** `{latency}ms`")
+
+        embed.add_field(
+            name="⚡ external apis",
+            value="\n".join(api_lines),
+            inline=True
+        )
+
         embed.add_field(
             name="📊 system info",
             value=(
@@ -112,7 +172,7 @@ def setup_utility(client: commands.Bot):
                 f"**python:** `{sys.version.split()[0]}`\n"
                 f"**discord.py:** `{discord.__version__}`{shard_info}"
             ),
-            inline=False
+            inline=True
         )
 
         embed.set_image(url="attachment://latency_chart.png")
