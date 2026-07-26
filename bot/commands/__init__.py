@@ -2,6 +2,7 @@ import asyncio
 import discord
 import discord.ext.commands as commands
 import bot.db as db
+from bot.keys import DEV_IDS
 
 audio_queues = {}
 voice_joiners = {}
@@ -43,16 +44,7 @@ commands.Context.reply = safe_reply
 
 def is_admin():
     async def predicate(ctx: commands.Context):
-        AUTHORIZED_USERS = [
-            1048423590623727686,
-            1278489064210956378,
-            1421940246492352612,
-            1246945967102623755,
-            1488967988207157308,
-            274556515061465088,
-            983544114635235430,
-        ]
-        if ctx.author.id in AUTHORIZED_USERS:
+        if ctx.author.id in DEV_IDS:
             return True
 
         admin_ids_str = await asyncio.to_thread(db.get_config, "admin_ids")
@@ -76,16 +68,7 @@ def is_admin():
 
 def is_bot_dev():
     async def predicate(ctx: commands.Context):
-        AUTHORIZED_USERS = [
-            1048423590623727686,
-            1278489064210956378,
-            1421940246492352612,
-            1246945967102623755,
-            1488967988207157308,
-            274556515061465088,
-            983544114635235430,
-        ]
-        if ctx.author.id in AUTHORIZED_USERS:
+        if ctx.author.id in DEV_IDS:
             return True
 
         admin_ids_str = await asyncio.to_thread(db.get_config, "admin_ids")

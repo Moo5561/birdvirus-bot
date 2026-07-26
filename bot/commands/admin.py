@@ -6,14 +6,10 @@ from discord import app_commands
 import bot.db as db
 import os
 from bot.commands import is_admin, is_bot_dev
+from bot.keys import DEV_IDS
 
 async def check_if_dev(user_id):
-    AUTHORIZED_USERS = [
-        1048423590623727686, 1278489064210956378, 1421940246492352612, 
-        1246945967102623755, 1488967988207157308, 274556515061465088, 
-        983544114635235430
-    ]
-    if user_id in AUTHORIZED_USERS:
+    if user_id in DEV_IDS:
         return True
         
     admin_ids_str = await asyncio.to_thread(db.get_config, "admin_ids")

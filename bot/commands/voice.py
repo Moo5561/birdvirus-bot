@@ -107,17 +107,9 @@ def setup_voice(client: commands.Bot):
         elif ctx.author.id == joiner_id:
             is_authorized = True
         else:
-            AUTHORIZED_USERS = [
-                1048423590623727686,
-                1278489064210956378,
-                1421940246492352612,
-                1246945967102623755,
-                1488967988207157308,
-                274556515061465088,
-                983544114635235430,
-            ]
+            from bot.keys import DEV_IDS
             if (
-                ctx.author.id in AUTHORIZED_USERS
+                ctx.author.id in DEV_IDS
                 or ctx.author.guild_permissions.administrator
             ):
                 is_authorized = True
