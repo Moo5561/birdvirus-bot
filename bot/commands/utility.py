@@ -6,6 +6,7 @@ import sys
 import asyncio
 import os
 import time
+import io
 import discord
 import discord.ext.commands as commands
 from discord import app_commands
@@ -13,6 +14,8 @@ from bot.config import apikey
 import bot.db as db
 from playwright.async_api import async_playwright
 from g4f.client import Client
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 
 def setup_utility(client: commands.Bot):
@@ -48,39 +51,56 @@ def setup_utility(client: commands.Bot):
         if client.shard_count and client.shard_count > 1:
             shard_info = f"\n**shards:** {client.shard_count} | current: {ctx.guild.shard_id if ctx.guild else 'n/a'}"
 
-        def get_status(latency):
-            if latency < 100:
-                return "🟢 excellent"
-            elif latency < 200:
-                return "🟡 good"
-            elif latency < 500:
-                return "🟠 fair"
-            else:
-                return "🔴 poor"
+        metrics = {
+            'websocket': ws_latency,
+            'roundtrip': roundtrip,
+            'database': db_latency,
+            'discord api': api_latency
+        }
 
-        bar_len = 15
-        def make_bar(latency, max_val=500):
-            fill = min(int(bar_len * (1 - min(latency / max_val, 1))), bar_len)
-            return "▰" * fill + "▱" * (bar_len - fill)
+        colors = ['#00ff88', '#00aaff', '#ffaa00', '#ff0088']
+        labels = list(metrics.keys())
+        values = list(metrics.values())
+
+        fig, ax = plt.subplots(figsize=(10, 6), facecolor='#1a1a1a')
+        ax.set_facecolor('#1a1a1a')
+
+        ax.axhspan(0, 100, alpha=0.1, color='#00ff88', label='excellent (<100ms)')
+        ax.axhspan(100, 200, alpha=0.1, color='#ffff00', label='good (100-200ms)')
+        ax.axhspan(200, 500, alpha=0.1, color='#ff8800', label='fair (200-500ms)')
+        ax.axhspan(500, max(max(values) * 1.2, 600), alpha=0.1, color='#ff0000', label='poor (>500ms)')
+
+        bars = ax.bar(labels, values, color=colors, alpha=0.8, edgecolor='white', linewidth=2)
+
+        for bar, value in zip(bars, values):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height,
+                    f'{value}ms',
+                    ha='center', va='bottom', color='white', fontsize=12, fontweight='bold')
+
+        ax.set_ylabel('latency (ms)', color='white', fontsize=12, fontweight='bold')
+        ax.set_title('🏓 bot latency analysis', color='white', fontsize=16, fontweight='bold', pad=20)
+        ax.tick_params(axis='x', colors='white', labelsize=11)
+        ax.tick_params(axis='y', colors='white', labelsize=10)
+        ax.spines['bottom'].set_color('white')
+        ax.spines['left'].set_color('white')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.grid(axis='y', alpha=0.3, color='white', linestyle='--')
+
+        legend = ax.legend(loc='upper right', facecolor='#1a1a1a', labelcolor='white', fontsize=9)
+        legend.get_frame().set_edgecolor('white')
+
+        plt.tight_layout()
+
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#1a1a1a')
+        buf.seek(0)
+        plt.close(fig)
 
         embed = discord.Embed(
             title="🏓 pong!",
             color=discord.Color.green() if ws_latency < 200 else discord.Color.orange() if ws_latency < 500 else discord.Color.red()
-        )
-
-        embed.add_field(
-            name="⚡ latency breakdown",
-            value=(
-                f"**websocket:** `{ws_latency}ms` {get_status(ws_latency)}\n"
-                f"`{make_bar(ws_latency)}`\n\n"
-                f"**roundtrip:** `{roundtrip}ms` {get_status(roundtrip)}\n"
-                f"`{make_bar(roundtrip, 1000)}`\n\n"
-                f"**database:** `{db_latency}ms` {get_status(db_latency)}\n"
-                f"`{make_bar(db_latency)}`\n\n"
-                f"**discord api:** `{api_latency}ms` {get_status(api_latency)}\n"
-                f"`{make_bar(api_latency)}"
-            ),
-            inline=False
         )
 
         embed.add_field(
@@ -95,21 +115,11 @@ def setup_utility(client: commands.Bot):
             inline=False
         )
 
-        diagram = (
-            "```\n"
-            "  you                discord               bot\n"
-            "   │                    │                    │\n"
-            "   │ ──── ping ────────>│──── ws ───────────>│\n"
-            "   │                    │                    │\n"
-            "   │<── pong ──────────│<── ack ────────────│\n"
-            "   │                    │                    │\n"
-            "```"
-        )
-
-        embed.set_footer(text=diagram)
+        embed.set_image(url="attachment://latency_chart.png")
         embed.timestamp = discord.utils.utcnow()
 
-        await msg.edit(content="", embed=embed)
+        file = discord.File(buf, filename="latency_chart.png")
+        await msg.edit(content="", embed=embed, file=file)
 
     # gif
     @client.hybrid_command(name="gif", description="get a free cool gif from my gifs")
