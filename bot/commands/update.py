@@ -114,3 +114,10 @@ def setup_update(client: commands.Bot):
             pass
 
         os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    @update_cmd.error
+    async def update_cmd_error(ctx: commands.Context, error):
+        if isinstance(error, commands.CheckFailure):
+            await ctx.reply("you don't have permission to use this command")
+        else:
+            await ctx.reply(f"error: {error}")
