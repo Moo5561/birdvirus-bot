@@ -7,6 +7,7 @@ import bot.db as db
 from bot.commands import is_admin
 from bot.commands.blackjack import BlackjackView, draw_card
 from bot.commands.horserace import HorseRaceView
+from bot.commands.catrace import CatRaceView
 
 async def get_balance_checked(ctx, user_id):
     if ctx.bot.user and ctx.bot.user.id == 1522117141090799697:
@@ -559,6 +560,22 @@ def setup_economy(client: commands.Bot):
 
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         view = HorseRaceView(ctx, bet, coin_emoji)
+        await view.start(ctx)
+
+    @pure_catrace_command := pure_group.command(name="catrace", description="bet on a cat race at the birdvirus track")
+    @app_commands.describe(bet="the amount of coins to bet")
+    async def pure_catrace(ctx: commands.Context, bet: int):
+        if bet <= 0:
+            await ctx.reply("bet must be greater than zero")
+            return
+
+        bal, _ = await get_balance_checked(ctx, ctx.author.id)
+        if bal < bet and ctx.bot.user.id != 1522117141090799697:
+            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
+            return
+
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        view = CatRaceView(ctx, bet, coin_emoji)
         await view.start(ctx)
 
     # Beg command

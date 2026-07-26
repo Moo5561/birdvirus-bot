@@ -110,6 +110,7 @@ from .economy import setup_economy
 from .admin import setup_admin
 from .utility import setup_utility
 from .horserace import setup_horserace
+from .catrace import setup_catrace
 from .job import setup_job
 from .update import setup_update
 
@@ -119,6 +120,7 @@ def setup(client: commands.Bot):
     setup_voice(client)
     setup_economy(client)
     setup_horserace(client)
+    setup_catrace(client)
     setup_admin(client)
     setup_utility(client)
     setup_job(client)
