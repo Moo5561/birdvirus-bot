@@ -14,6 +14,50 @@ async def get_balance_checked(ctx, user_id):
         return 999999999999999999999999999, 999999999999999999999999999
     return await asyncio.to_thread(db.get_balances, user_id)
 
+async def build_leaderboard_embed(ctx, all_users, page, total_pages, coin_emoji):
+    PAGE_SIZE = 10
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    start = (page - 1) * PAGE_SIZE
+    page_users = all_users[start:start + PAGE_SIZE]
+
+    lines = []
+    for i, user in enumerate(page_users):
+        rank = start + i + 1
+        medal = medals.get(rank, f"`#{rank}`")
+
+        try:
+            member = ctx.guild.get_member(user["user_id"])
+            if member is None:
+                try:
+                    member = await ctx.guild.fetch_member(user["user_id"])
+                    name = discord.utils.escape_markdown(member.display_name)
+                except (discord.NotFound, discord.HTTPException):
+                    try:
+                        global_user = await ctx.bot.fetch_user(user["user_id"])
+                        name = discord.utils.escape_markdown(global_user.display_name or global_user.name)
+                    except (discord.NotFound, discord.HTTPException):
+                        name = f"Deleted User ({user['user_id']})"
+            else:
+                name = discord.utils.escape_markdown(member.display_name)
+        except Exception:
+            name = f"Deleted User ({user['user_id']})"
+
+        total = user["balance"] + user["bank"]
+        lines.append(
+            f"{medal} **{name}**\n"
+            f"┣ total: {coin_emoji} `{total:,}`\n"
+            f"┣ holding: 💰 `{user['balance']:,}`\n"
+            f"┗ bank: 🏦 `{user['bank']:,}`"
+        )
+
+    embed = discord.Embed(
+        title="🏆 Leaderboard",
+        description="\n\n".join(lines),
+        color=0xf1c40f
+    )
+    embed.set_footer(text=f"page {page}/{total_pages} • {len(all_users)} players total")
+    return embed
+
 class LeaderboardView(discord.ui.View):
     def __init__(self, ctx, all_users, current_page, total_pages, coin_emoji):
         super().__init__(timeout=60.0)
@@ -29,59 +73,15 @@ class LeaderboardView(discord.ui.View):
         self.prev_button.disabled = self.current_page <= 1
         self.next_button.disabled = self.current_page >= self.total_pages
 
-    async def _build_embed(self, page):
-        PAGE_SIZE = 10
-        medals = {1: "🥇", 2: "🥈", 3: "🥉"}
-        start = (page - 1) * PAGE_SIZE
-        page_users = self.all_users[start:start + PAGE_SIZE]
-
-        lines = []
-        for i, user in enumerate(page_users):
-            rank = start + i + 1
-            medal = medals.get(rank, f"`#{rank}`")
-
-            try:
-                member = self.ctx.guild.get_member(user["user_id"])
-                if member is None:
-                    try:
-                        member = await self.ctx.guild.fetch_member(user["user_id"])
-                        name = discord.utils.escape_markdown(member.display_name)
-                    except (discord.NotFound, discord.HTTPException):
-                        try:
-                            global_user = await self.ctx.bot.fetch_user(user["user_id"])
-                            name = discord.utils.escape_markdown(global_user.display_name or global_user.name)
-                        except (discord.NotFound, discord.HTTPException):
-                            name = f"Deleted User ({user['user_id']})"
-                else:
-                    name = discord.utils.escape_markdown(member.display_name)
-            except Exception:
-                name = f"Unknown User ({user['user_id']})"
-
-            total = user["balance"] + user["bank"]
-            lines.append(
-                f"{medal} **{name}**\n"
-                f"┣ total: {self.coin_emoji} `{total:,}`\n"
-                f"┣ holding: `{user['balance']:,}`\n"
-                f"┗ bank: `{user['bank']:,}`"
-            )
-
-        embed = discord.Embed(
-            title="🏆 Leaderboard",
-            description="\n\n".join(lines),
-            color=0xf1c40f
-        )
-        embed.set_footer(text=f"page {page}/{self.total_pages} • {len(self.all_users)} players total")
-        return embed
-
-    @discord.ui.button(label="< prev", style=discord.ButtonStyle.grey)  
+    @discord.ui.button(label="< prev", style=discord.ButtonStyle.grey)
     async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.ctx.author.id:
             await interaction.response.send_message("this is not your leaderboard dude", ephemeral=True)
             return
-        await interaction.response.defer()  # defer first
+        await interaction.response.defer()
         self.current_page -= 1
         self._update_buttons()
-        embed = await self._build_embed(self.current_page)
+        embed = await build_leaderboard_embed(self.ctx, self.all_users, self.current_page, self.total_pages, self.coin_emoji)
         await interaction.edit_original_response(embed=embed, view=self)
 
     @discord.ui.button(label="next >", style=discord.ButtonStyle.grey)
@@ -89,11 +89,19 @@ class LeaderboardView(discord.ui.View):
         if interaction.user.id != self.ctx.author.id:
             await interaction.response.send_message("this is not your leaderboard dude", ephemeral=True)
             return
-        await interaction.response.defer()  # defer first
+        await interaction.response.defer()
         self.current_page += 1
         self._update_buttons()
-        embed = await self._build_embed(self.current_page)
+        embed = await build_leaderboard_embed(self.ctx, self.all_users, self.current_page, self.total_pages, self.coin_emoji)
         await interaction.edit_original_response(embed=embed, view=self)
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        try:
+            await self.message.edit(view=self)
+        except:
+            pass
 
 class BirdvirusGameView(discord.ui.View):
     def __init__(self, ctx, bet, birds_data, correct_count, coin_emoji):
@@ -666,7 +674,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("this command can only be used in a server")
             return
 
-        await ctx.defer()  # acknowledge the interaction immediately
+        await ctx.defer()
 
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         all_users = await asyncio.to_thread(db.get_all_balances)
@@ -680,48 +688,8 @@ def setup_economy(client: commands.Bot):
         PAGE_SIZE = 10
         total_pages = max(1, (len(all_users) + PAGE_SIZE - 1) // PAGE_SIZE)
         page = max(1, min(page, total_pages))
-        start = (page - 1) * PAGE_SIZE
-        page_users = all_users[start:start + PAGE_SIZE]
 
-        medals = {1: "🥇", 2: "🥈", 3: "🥉"}
-        lines = []
-
-        for i, user in enumerate(page_users):
-            rank = start + i + 1
-            medal = medals.get(rank, f"`#{rank}`")
-
-            try:
-                member = ctx.guild.get_member(user["user_id"])
-                if member is None:
-                    try:
-                        member = await ctx.guild.fetch_member(user["user_id"])
-                        name = discord.utils.escape_markdown(member.display_name)
-                    except (discord.NotFound, discord.HTTPException):
-                        try:
-                            global_user = await ctx.bot.fetch_user(user["user_id"])
-                            name = discord.utils.escape_markdown(global_user.display_name or global_user.name)
-                        except (discord.NotFound, discord.HTTPException):
-                            name = f"Deleted User ({user['user_id']})"
-                else:
-                    name = discord.utils.escape_markdown(member.display_name)
-            except Exception:
-                name = f"Unknown User ({user['user_id']})"
-
-            total = user["balance"] + user["bank"]
-            lines.append(
-                f"{medal} **{name}**\n"
-                f"┣ total: {coin_emoji} `{total:,}`\n"
-                f"┣ holding: 💰 `{user['balance']:,}`\n"
-                f"┗ bank: 🏦 `{user['bank']:,}`"
-            )
-
-        embed = discord.Embed(
-            title="🏆 Leaderboard",
-            description="\n\n".join(lines),
-            color=0xf1c40f
-        )
-        embed.set_footer(text=f"page {page}/{total_pages} • {len(all_users)} players total")
-
+        embed = await build_leaderboard_embed(ctx, all_users, page, total_pages, coin_emoji)
         view = LeaderboardView(ctx, all_users, page, total_pages, coin_emoji)
         view.message = await ctx.reply(embed=embed, view=view)
         
