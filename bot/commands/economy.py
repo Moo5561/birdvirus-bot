@@ -41,24 +41,21 @@ class LeaderboardView(discord.ui.View):
             medal = medals.get(rank, f"`#{rank}`")
 
             try:
-                if self.ctx.guild is None:
-                    name = f"Unknown ({user['user_id']})"
-                else:
-                    member = self.ctx.guild.get_member(user["user_id"])
-                    if member is None:
-                        try:
-                            member = await self.ctx.guild.fetch_member(user["user_id"])
-                            name = discord.utils.escape_markdown(member.display_name)
-                        except (discord.NotFound, discord.HTTPException):
-                            try:
-                                global_user = await self.ctx.bot.fetch_user(user["user_id"])
-                                name = discord.utils.escape_markdown(global_user.name)
-                            except (discord.NotFound, discord.HTTPException):
-                                name = f"Unknown ({user['user_id']})"
-                    else:
+                member = self.ctx.guild.get_member(user["user_id"])
+                if member is None:
+                    try:
+                        member = await self.ctx.guild.fetch_member(user["user_id"])
                         name = discord.utils.escape_markdown(member.display_name)
+                    except (discord.NotFound, discord.HTTPException):
+                        try:
+                            global_user = await self.ctx.bot.fetch_user(user["user_id"])
+                            name = discord.utils.escape_markdown(global_user.display_name or global_user.name)
+                        except (discord.NotFound, discord.HTTPException):
+                            name = f"Deleted User ({user['user_id']})"
+                else:
+                    name = discord.utils.escape_markdown(member.display_name)
             except Exception:
-                name = f"Unknown ({user['user_id']})"
+                name = f"Unknown User ({user['user_id']})"
 
             total = user["balance"] + user["bank"]
             lines.append(
@@ -702,13 +699,13 @@ def setup_economy(client: commands.Bot):
                     except (discord.NotFound, discord.HTTPException):
                         try:
                             global_user = await ctx.bot.fetch_user(user["user_id"])
-                            name = discord.utils.escape_markdown(global_user.name)
+                            name = discord.utils.escape_markdown(global_user.display_name or global_user.name)
                         except (discord.NotFound, discord.HTTPException):
-                            name = f"Unknown ({user['user_id']})"
+                            name = f"Deleted User ({user['user_id']})"
                 else:
                     name = discord.utils.escape_markdown(member.display_name)
             except Exception:
-                name = f"Unknown ({user['user_id']})"
+                name = f"Unknown User ({user['user_id']})"
 
             total = user["balance"] + user["bank"]
             lines.append(
