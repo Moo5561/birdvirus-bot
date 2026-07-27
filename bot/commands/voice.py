@@ -89,7 +89,6 @@ def setup_voice(client: commands.Bot):
             if ctx.voice_client.channel == channel:
                 await ctx.reply("already in there")
                 return
-            await ctx.voice_client.move_to(channel)
         else:
             await channel.connect()
 
