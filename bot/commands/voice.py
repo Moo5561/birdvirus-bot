@@ -26,7 +26,7 @@ def play_next(error, vc, guild_id):
     if guild_id in audio_queues and len(audio_queues[guild_id]) > 0:
         source = audio_queues[guild_id].pop(0)
         vol = 1.0 if "badapple_max" in source else 0.60
-        actual_source = source if source.startswith("mp3/") else f"mp3/{source}"
+        actual_source = source if (source.startswith("mp3/") or source.startswith("http")) else f"mp3/{source}"
         audio_source = discord.PCMVolumeTransformer(
             discord.FFmpegPCMAudio(actual_source), volume=vol
         )
@@ -42,7 +42,7 @@ def queue_audio(vc, source):
 
     if not vc.is_playing():
         vol = 1.0 if "badapple_max" in source else 0.60
-        actual_source = source if source.startswith("mp3/") else f"mp3/{source}"
+        actual_source = source if (source.startswith("mp3/") or source.startswith("http")) else f"mp3/{source}"
         audio_source = discord.PCMVolumeTransformer(
             discord.FFmpegPCMAudio(actual_source), volume=vol
         )
@@ -57,7 +57,7 @@ def setup_voice(client: commands.Bot):
     @tasks.loop(seconds=15.0)
     async def voice_announcer():
         for vc in client.voice_clients:
-            if vc.is_connected():
+            if vc.is_connected() and not vc.is_playing():
                 if random.random() < 0.80:
                     try:
                         audio_file = (
@@ -181,10 +181,7 @@ def setup_voice(client: commands.Bot):
 
         try:
             audio_file = "birdvirus.mp3" if random.random() < 0.50 else "bird.mp3"
-            audio_source = discord.PCMVolumeTransformer(
-                discord.FFmpegPCMAudio(audio_file), volume=0.6
-            )
-            ctx.voice_client.play(audio_source)
+            queue_audio(ctx.voice_client, audio_file)
             await ctx.reply(audio_file.replace(".mp3", ""), ephemeral=True)
         except Exception as e:
             await ctx.reply(f"error playing audio: {e}")
