@@ -95,6 +95,7 @@ class BirdBot(commands.AutoShardedBot):
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
 client = BirdBot(
     command_prefix=get_prefix,
     intents=intents,

@@ -266,6 +266,14 @@ def update_bank(user_id: int, change: int) -> int:
     conn.close()
     return new_bank
 
+def get_all_balances() -> list[dict]:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id, balance, bank FROM economy ORDER BY (balance + bank) DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"user_id": row[0], "balance": row[1], "bank": row[2]} for row in rows]
+
 
 # Config Functions (Emoji, Properties channel, etc)
 def get_config(key: str, default: str = None) -> str:
