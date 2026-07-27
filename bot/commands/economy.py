@@ -14,6 +14,82 @@ async def get_balance_checked(ctx, user_id):
         return 999999999999999999999999999, 999999999999999999999999999
     return await asyncio.to_thread(db.get_balances, user_id)
 
+class LeaderboardView(discord.ui.View):
+    def __init__(self, ctx, all_users, current_page, total_pages, coin_emoji):
+        super().__init__(timeout=60.0)
+        self.ctx = ctx
+        self.all_users = all_users
+        self.current_page = current_page
+        self.total_pages = total_pages
+        self.coin_emoji = coin_emoji
+        self.message = None
+        self._update_buttons()
+
+    def _update_buttons(self):
+        self.prev_button.disabled = self.current_page <= 1
+        self.next_button.disabled = self.current_page >= self.total_pages
+
+    async def _build_embed(self, page):
+        PAGE_SIZE = 10
+        medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+        start = (page - 1) * PAGE_SIZE
+        page_users = self.all_users[start:start + PAGE_SIZE]
+
+        lines = []
+        for i, user in enumerate(page_users):
+            rank = start + i + 1
+            medal = medals.get(rank, f"`#{rank}`")
+
+            try:
+                member = self.ctx.guild.get_member(user["user_id"]) or await self.ctx.guild.fetch_member(user["user_id"])
+                name = member.display_name
+            except Exception:
+                name = f"Unknown ({user['user_id']})"
+
+            total = user["balance"] + user["bank"]
+            lines.append(
+                f"{medal} **{name}**\n"
+                f"┣ total: {self.coin_emoji} `{total:,}`\n"
+                f"┣ holding: `{user['balance']:,}`\n"
+                f"┗ bank: `{user['bank']:,}`"
+            )
+
+        embed = discord.Embed(
+            title="🏆 Leaderboard",
+            description="\n\n".join(lines),
+            color=0xf1c40f
+        )
+        embed.set_footer(text=f"page {page}/{self.total_pages} • {len(self.all_users)} players total")
+        return embed
+
+    @discord.ui.button(label="◀ prev", style=discord.ButtonStyle.grey)
+    async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message("this is not your leaderboard dude", ephemeral=True)
+            return
+        self.current_page -= 1
+        self._update_buttons()
+        embed = await self._build_embed(self.current_page)
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="next ▶", style=discord.ButtonStyle.grey)
+    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message("this is not your leaderboard dude", ephemeral=True)
+            return
+        self.current_page += 1
+        self._update_buttons()
+        embed = await self._build_embed(self.current_page)
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        try:
+            await self.message.edit(view=self)
+        except:
+            pass
+
 class BirdvirusGameView(discord.ui.View):
     def __init__(self, ctx, bet, birds_data, correct_count, coin_emoji):
         super().__init__(timeout=60.0)
@@ -577,6 +653,55 @@ def setup_economy(client: commands.Bot):
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         view = CatRaceView(ctx, bet, coin_emoji)
         await view.start(ctx)
+
+    @client.hybrid_command(name="leaderboard", description="view the richest players")
+    @app_commands.describe(page="page number to view")
+    async def leaderboard(ctx: commands.Context, page: int = 1):
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        all_users = await asyncio.to_thread(db.get_all_balances)
+        
+        if not all_users:
+            await ctx.reply("no one has any coins yet!")
+            return
+    
+        all_users.sort(key=lambda u: u["balance"] + u["bank"], reverse=True)
+    
+        PAGE_SIZE = 10
+        total_pages = max(1, (len(all_users) + PAGE_SIZE - 1) // PAGE_SIZE)
+        page = max(1, min(page, total_pages))
+        start = (page - 1) * PAGE_SIZE
+        page_users = all_users[start:start + PAGE_SIZE]
+    
+        medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    
+        lines = []
+        for i, user in enumerate(page_users):
+            rank = start + i + 1
+            medal = medals.get(rank, f"`#{rank}`")
+            
+            try:
+                member = ctx.guild.get_member(user["user_id"]) or await ctx.guild.fetch_member(user["user_id"])
+                name = member.display_name
+            except Exception:
+                name = f"Unknown User ({user['user_id']})"
+    
+            total = user["balance"] + user["bank"]
+            lines.append(
+                f"{medal} **{name}**\n"
+                f"┣ total: {coin_emoji} `{total:,}`\n"
+                f"┣ holding: `{user['balance']:,}`\n"
+                f"┗ bank: `{user['bank']:,}`"
+            )
+    
+        embed = discord.Embed(
+            title="🏆 Leaderboard",
+            description="\n\n".join(lines),
+            color=0xf1c40f
+        )
+        embed.set_footer(text=f"page {page}/{total_pages} • {len(all_users)} players total")
+        
+        view = LeaderboardView(ctx, all_users, page, total_pages, coin_emoji)
+        view.message = await ctx.reply(embed=embed, view=view)
 
     # Beg command
     @client.hybrid_command(name="beg", description="beg for some coins with low risk")
