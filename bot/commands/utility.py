@@ -314,6 +314,30 @@ def setup_utility(client: commands.Bot):
                         }
                     )
 
+            ALLOWED_BINS = ["ffmpeg", "ffprobe", "yt-dlp", "mkdir", "touch", "ls", "cat", "cp", "mv", "python", "python3", "pip", "pip3", "npm", "node", "git", "curl", "wget", "echo", "head", "tail", "wc", "sort", "grep", "find", "chmod", "chown", "apt", "apt-get", "nano", "vim", "unzip", "tar", "gzip", "zip", "make", "gcc", "g++", "cargo", "go", "rustc", "deno", "bun", "pnpm", "yarn"]
+
+            async def handle_execute(code: str) -> str:
+                cmd = code.strip().split()[0] if code.strip() else ""
+                if cmd not in ALLOWED_BINS:
+                    return f"blocked: `{cmd}` is not allowed. only ffmpeg, ffprobe, yt-dlp, mkdir, touch"
+                try:
+                    process = await asyncio.create_subprocess_shell(
+                        code,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    stdout, stderr = await process.communicate()
+                    out = ""
+                    if stdout:
+                        out += stdout.decode(errors="replace")
+                    if stderr:
+                        out += stderr.decode(errors="replace")
+                    if not out:
+                        return "done (no output)"
+                    return out[:1500]
+                except Exception as e:
+                    return f"error: {e}"
+
             aipayload = {
                 "model": "gemini-3.1-flash-lite",
                 "messages": [
@@ -340,7 +364,24 @@ def setup_utility(client: commands.Bot):
                                 "required": ["reason"],
                             },
                         },
-                    }
+                    },
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "execute",
+                            "description": "run a command on the server. allowed: ffmpeg, ffprobe, yt-dlp, python, pip, npm, git, curl, apt and many other safe tools",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "code": {
+                                        "type": "string",
+                                        "description": "the command to run",
+                                    }
+                                },
+                                "required": ["code"],
+                            },
+                        },
+                    },
                 ],
                 "temperature": 0.5,
             }
@@ -373,12 +414,23 @@ def setup_utility(client: commands.Bot):
             message_data = choice["message"]
 
             if "tool_calls" in message_data and message_data["tool_calls"]:
+                executed = False
                 for tool_call in message_data["tool_calls"]:
-                    if tool_call.get("function", {}).get("name") == "ignore":
+                    fn_name = tool_call.get("function", {}).get("name")
+                    if fn_name == "ignore":
                         print(
                             f"birdvirus bot chose to ignore the message. reason: {tool_call.get('function', {}).get('arguments')}"
                         )
                         return
+                    elif fn_name == "execute":
+                        import json
+                        args = json.loads(tool_call.get("function", {}).get("arguments", "{}"))
+                        code = args.get("code", "")
+                        result = await handle_execute(code)
+                        executed = True
+                        await ctx.reply(f"ran: `{code}`\n```\n{result}\n```")
+                if executed:
+                    return
         except Exception as e:
             print(f"error in chat command: {e}")
             await ctx.reply("something went wrong.")

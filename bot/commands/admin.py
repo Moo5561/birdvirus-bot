@@ -322,3 +322,17 @@ def setup_admin(client: commands.Bot):
         await asyncio.to_thread(db.set_bank, user.id, amount)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         await ctx.reply(f"set {user.display_name}s bank balance to {amount} {coin_emoji}")
+
+    @ec_add_command := ec_group.command(name="add", description="add coins to a user's holding (admin only)")
+    @is_admin()
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(user="the user to give coins to", amount="how many coins to add")
+    async def ec_add(ctx: commands.Context, user: discord.Member, amount: int):
+        if amount <= 0:
+            await ctx.reply("amount must be greater than zero")
+            return
+        new_balance = await asyncio.to_thread(db.update_balance, user.id, amount)
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        await ctx.reply(f"added {amount} {coin_emoji} to {user.display_name}s holding (new balance: {new_balance} {coin_emoji})")
+
+

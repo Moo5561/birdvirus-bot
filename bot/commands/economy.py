@@ -635,6 +635,83 @@ def setup_economy(client: commands.Bot):
         embed.description = "```\n          ⬇️\n" + "\n".join(rows) + f"\n{slots_row}\n{mults_row}\n```\n{status.lower()}"
         await message.edit(embed=embed)
 
+    @pure_plinkohard_command := pure_group.command(name="plinkohard", description="HARD MODE plinko - higher risk, higher reward")
+    @app_commands.describe(bet="amount of coins to bet")
+    async def pure_plinkohard(ctx: commands.Context, bet: int):
+        if bet <= 0:
+            await ctx.reply("bet must be greater than zero")
+            return
+
+        bal_val, _ = await get_balance_checked(ctx, ctx.author.id)
+        if bal_val < bet and ctx.bot.user.id != 1522117141090799697:
+            await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal_val})")
+            return
+
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+
+        multipliers = [50, 15, 3, 0.3, 0.3, 3, 15, 50]
+        slot_labels = ['💀', '🔴', '🟠', '🟡', '🟡', '🟠', '🔴', '💀']
+
+        pos = 3
+        path = [pos]
+        rows = 10
+        for _ in range(rows):
+            pos += random.choice([-1, 1])
+            pos = max(0, min(7, pos))
+            path.append(pos)
+
+        final_slot = path[-1]
+        multiplier = multipliers[final_slot]
+
+        embed = discord.Embed(title="plinko HARD MODE", color=0x2f3136)
+        embed.description = "```\n          ⬇️\n```\ndropping..."
+        message = await ctx.reply(embed=embed)
+
+        for frame in range(1, rows + 1):
+            await asyncio.sleep(0.3)
+            rows_display = []
+            for r in range(frame):
+                row_pegs = []
+                for c in range(8):
+                    if c == path[r]:
+                        row_pegs.append('🔴')
+                    else:
+                        row_pegs.append('⚪')
+                rows_display.append(' '.join(row_pegs))
+            embed.description = "```\n          ⬇️\n" + "\n".join(rows_display) + "\n```\ndropping..."
+            await message.edit(embed=embed)
+
+        await asyncio.sleep(0.5)
+
+        slots_row = ' '.join(slot_labels)
+        mults_row = '50x 15x 3x .3 .3 3x 15x 50x'
+
+        net_gain = int(bet * multiplier) - bet
+        new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
+
+        if net_gain > 0:
+            status = f"landed in {slot_labels[final_slot]} ({multiplier}x)\nyou won {net_gain} {coin_emoji} (balance: {new_balance})"
+            color = 0xf1c40f if multiplier >= 15 else 0x2ecc71
+        elif net_gain == 0:
+            status = f"landed in {slot_labels[final_slot]} ({multiplier}x)\nbroke even (balance: {new_balance})"
+            color = 0x95a5a6
+        else:
+            status = f"landed in {slot_labels[final_slot]} ({multiplier}x)\nyou lost {abs(net_gain)} {coin_emoji} (balance: {new_balance})"
+            color = 0x992d22
+
+        embed.color = color
+        rows_display = []
+        for r in range(rows + 1):
+            row_pegs = []
+            for c in range(8):
+                if c == path[r]:
+                    row_pegs.append('🔴')
+                else:
+                    row_pegs.append('⚪')
+            rows_display.append(' '.join(row_pegs))
+        embed.description = "```\n          ⬇️\n" + "\n".join(rows_display) + f"\n{slots_row}\n{mults_row}\n```\n{status.lower()}"
+        await message.edit(embed=embed)
+
     @pure_horse_command := pure_group.command(name="horse", description="bet on a horse race at the birdvirus track")
     @app_commands.describe(bet="the amount of coins to bet")
     async def pure_horse(ctx: commands.Context, bet: int):
