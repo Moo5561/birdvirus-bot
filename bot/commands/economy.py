@@ -551,7 +551,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("bet must be greater than zero")
             return
 
-        bal_val, _ = await get_balance_checked(ctx, ctx.author.id)
+        bal_val, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal_val < bet and ctx.bot.user.id != 1522117141090799697:
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal_val})")
             return
@@ -598,7 +598,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("bet must be greater than zero")
             return
 
-        bal_val, _ = await get_balance_checked(ctx, ctx.author.id)
+        bal_val, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal_val < bet and ctx.bot.user.id != 1522117141090799697:
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal_val})")
             return
@@ -675,7 +675,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("bet must be greater than zero")
             return
 
-        bal_val, _ = await get_balance_checked(ctx, ctx.author.id)
+        bal_val, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal_val < bet and ctx.bot.user.id != 1522117141090799697:
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal_val})")
             return
