@@ -335,4 +335,40 @@ def setup_admin(client: commands.Bot):
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         await ctx.reply(f"added {amount} {coin_emoji} to {user.display_name}s holding (new balance: {new_balance} {coin_emoji})")
 
+    @ec_taxrate_command := ec_group.command(name="taxrate", description="set the tax rate on gambling wins (admin only)")
+    @is_admin()
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(percent="tax rate as a percentage (0 to disable)")
+    async def ec_taxrate(ctx: commands.Context, percent: int):
+        if percent < 0 or percent > 100:
+            await ctx.reply("tax rate must be between 0 and 100")
+            return
+        await asyncio.to_thread(db.set_config, "tax_rate", str(percent))
+        await ctx.reply(f"set tax rate to {percent}% on gambling winnings")
 
+    @ec_taxinfo_command := ec_group.command(name="taxinfo", description="view tax info (admin only)")
+    @is_admin()
+    async def ec_taxinfo(ctx: commands.Context):
+        rate = await asyncio.to_thread(db.get_config, "tax_rate", "0")
+        collected = await asyncio.to_thread(db.get_config, "tax_collected", "0")
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        await ctx.reply(f"tax rate: {rate}% | total collected: {int(collected):,} {coin_emoji}")
+
+    @ec_debtforgive_command := ec_group.command(name="debtforgive", description="forgive a user's debt (admin only)")
+    @is_admin()
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(user="the user to forgive debt for")
+    async def ec_debtforgive(ctx: commands.Context, user: discord.Member):
+        await asyncio.to_thread(db.set_debt, user.id, 0)
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        await ctx.reply(f"forgiven all debt for {user.display_name} {coin_emoji}")
+
+    @ec_debtlist_command := ec_group.command(name="debtlist", description="list all users with debt (admin only)")
+    @is_admin()
+    async def ec_debtlist(ctx: commands.Context):
+        debts = await asyncio.to_thread(db.get_all_debts)
+        if not debts:
+            await ctx.reply("no one has debt")
+            return
+        lines = [f"<@{d['user_id']}>: {d['debt']:,} debt (holding: {d['balance']:,}, bank: {d['bank']:,})" for d in debts[:20]]
+        await ctx.reply("### debts\n" + "\n".join(lines))

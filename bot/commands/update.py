@@ -15,10 +15,14 @@ SNAPSHOT_FILE = "update_snapshot.txt"
 
 
 def get_current_head():
-    result = subprocess.run(
-        ["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=10
-    )
-    return result.stdout.strip() if result.returncode == 0 else None
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=10
+        )
+        return result.stdout.strip() if result.returncode == 0 else None
+    except FileNotFoundError:
+        log.error("git not found on this system")
+        return None
 
 
 def syntax_check():

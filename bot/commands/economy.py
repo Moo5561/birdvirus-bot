@@ -11,8 +11,33 @@ from bot.commands.catrace import CatRaceView
 
 async def get_balance_checked(ctx, user_id):
     if ctx.bot.user and ctx.bot.user.id == 1522117141090799697:
-        return 999999999999999999999999999, 999999999999999999999999999
-    return await asyncio.to_thread(db.get_balances, user_id)
+        return 999999999999999999999999999, 999999999999999999999999999, 0
+    bal, bank, debt = await asyncio.to_thread(db.get_balances, user_id)
+    return bal, bank, debt
+
+async def apply_tax(ctx, user_id, net_gain):
+    if net_gain <= 0:
+        return 0
+    tax_rate_str = await asyncio.to_thread(db.get_config, "tax_rate", "0")
+    tax_rate = int(tax_rate_str)
+    if tax_rate <= 0:
+        return 0
+    if ctx.bot.user and ctx.bot.user.id == 1522117141090799697:
+        return 0
+    tax_amount = max(1, int(net_gain * tax_rate / 100))
+    await asyncio.to_thread(db.update_balance, user_id, -tax_amount)
+    collected = await asyncio.to_thread(db.get_config, "tax_collected", "0")
+    await asyncio.to_thread(db.set_config, "tax_collected", str(int(collected) + tax_amount))
+    return tax_amount
+
+def update_with_tax(ctx, user_id, net_gain):
+    async def wrapper():
+        new_bal = await asyncio.to_thread(db.update_balance, user_id, net_gain)
+        tax = 0
+        if net_gain > 0:
+            tax = await apply_tax(ctx, user_id, net_gain)
+        return new_bal, tax
+    return wrapper()
 
 async def build_leaderboard_embed(ctx, all_users, page, total_pages, coin_emoji):
     PAGE_SIZE = 10
@@ -154,7 +179,8 @@ class BirdvirusGameView(discord.ui.View):
                 multiplier = 5 
                 net_gain = int(self.bet * multiplier) - self.bet
                 new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, net_gain)
-                status = f"correct! there were {self.correct_count} infected birds. you won {net_gain} {self.coin_emoji} (balance: {new_balance})"
+                tax = await apply_tax(self.ctx, self.ctx.author.id, net_gain)
+                status = f"correct! there were {self.correct_count} infected birds. you won {net_gain} {self.coin_emoji} (balance: {new_balance}) (tax: {tax} {self.coin_emoji})"
                 color = 0x2ecc71
             else:
                 net_gain = -self.bet
@@ -202,7 +228,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("bet must be greater than zero")
             return
             
-        bal, _ = await get_balance_checked(ctx, ctx.author.id)
+        bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal < bet and ctx.bot.user.id != 1522117141090799697:
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
@@ -211,8 +237,10 @@ def setup_economy(client: commands.Bot):
         win = random.choice([True, False])
         
         if win:
+            net_gain = bet
             new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, bet)
-            await ctx.reply(f"you won! doubled your bet of {bet} {coin_emoji} (balance: {new_balance})")
+            tax = await apply_tax(ctx, ctx.author.id, net_gain)
+            await ctx.reply(f"you won! doubled your bet of {bet} {coin_emoji} (balance: {new_balance}) (tax: {tax} {coin_emoji})")
         else:
             new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, -bet)
             await ctx.reply(f"you lost {bet} {coin_emoji} unlucky dude (balance: {new_balance})")
@@ -247,7 +275,8 @@ def setup_economy(client: commands.Bot):
             else:
                 payout = int(bet * 1.5)
                 new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, payout)
-                await ctx.reply(f"natural blackjack! you won {payout} {coin_emoji} (balance: {new_balance})")
+                tax = await apply_tax(ctx, ctx.author.id, payout)
+                await ctx.reply(f"natural blackjack! you won {payout} {coin_emoji} (balance: {new_balance}) (tax: {tax} {coin_emoji})")
             return
 
         view = BlackjackView(ctx, bet, player_hand, dealer_hand, coin_emoji)
@@ -260,7 +289,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("bet must be greater than zero")
             return
             
-        bal, _ = await get_balance_checked(ctx, ctx.author.id)
+        bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal < bet and ctx.bot.user.id != 1522117141090799697:
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
@@ -325,7 +354,8 @@ def setup_economy(client: commands.Bot):
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
         
         if net_gain > 0:
-            status_text = f"{status}\nyou won {net_gain} {coin_emoji}! (balance: {new_balance})"
+            tax = await apply_tax(ctx, ctx.author.id, net_gain)
+            status_text = f"{status}\nyou won {net_gain} {coin_emoji}! (balance: {new_balance}) (tax: {tax} {coin_emoji})"
             color = 0xf1c40f if multiplier >= 5 else 0x2ecc71
         else:
             status_text = f"{status}\nyou lost {bet} {coin_emoji}. unlucky (balance: {new_balance})"
@@ -345,7 +375,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("bet must be greater than zero")
             return
             
-        bal, _ = await get_balance_checked(ctx, ctx.author.id)
+        bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal < bet and ctx.bot.user.id != 1522117141090799697:
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
@@ -441,7 +471,8 @@ def setup_economy(client: commands.Bot):
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
         
         if win:
-            status_text = f"the ball landed on {result_color_emoji} {spin_result}!\nyou won {net_gain} {coin_emoji}! (balance: {new_balance})"
+            tax = await apply_tax(ctx, ctx.author.id, net_gain)
+            status_text = f"the ball landed on {result_color_emoji} {spin_result}!\nyou won {net_gain} {coin_emoji}! (balance: {new_balance}) (tax: {tax} {coin_emoji})"
             color = 0x2ecc71
         else:
             status_text = f"the ball landed on {result_color_emoji} {spin_result}.\nyou lost {bet} {coin_emoji}. unlucky (balance: {new_balance})"
@@ -458,7 +489,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("bet must be greater than zero")
             return
             
-        bal, bank = await get_balance_checked(ctx, ctx.author.id)
+        bal, bank, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal < bet and ctx.bot.user.id != 1522117141090799697:
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
@@ -501,13 +532,14 @@ def setup_economy(client: commands.Bot):
         else:
             net_gain = int(bet * multiplier) - bet
             new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
+            tax = await apply_tax(ctx, ctx.author.id, net_gain)
             
         if multiplier <= 0:
             color = 0xe74c3c if roll != 1 else 0x992d22
             status_text = f"**d20 ROLL: {roll}**\n{status}\nyou lost {abs(net_gain)} {coin_emoji}. (holding balance: {new_balance})"
         else:
             color = 0x2ecc71 if roll != 20 else 0xf1c40f
-            status_text = f"**d20 ROLL: {roll}**\n{status}\nyou won {net_gain} {coin_emoji}! (holding balance: {new_balance})"
+            status_text = f"**d20 ROLL: {roll}**\n{status}\nyou won {net_gain} {coin_emoji}! (holding balance: {new_balance}) (tax: {tax} {coin_emoji})"
             
         embed = discord.Embed(title="insane dice roll", description=status_text.lower(), color=color)
         await ctx.reply(embed=embed)
@@ -613,7 +645,8 @@ def setup_economy(client: commands.Bot):
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
 
         if net_gain > 0:
-            status = f"landed in {slot_labels[final_slot]} ({multiplier}x)\nyou won {net_gain} {coin_emoji} (balance: {new_balance})"
+            tax = await apply_tax(ctx, ctx.author.id, net_gain)
+            status = f"landed in {slot_labels[final_slot]} ({multiplier}x)\nyou won {net_gain} {coin_emoji} (balance: {new_balance}) (tax: {tax} {coin_emoji})"
             color = 0xf1c40f if multiplier >= 5 else 0x2ecc71
         elif net_gain == 0:
             status = f"landed in {slot_labels[final_slot]} ({multiplier}x)\nbroke even (balance: {new_balance})"
@@ -690,7 +723,8 @@ def setup_economy(client: commands.Bot):
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
 
         if net_gain > 0:
-            status = f"landed in {slot_labels[final_slot]} ({multiplier}x)\nyou won {net_gain} {coin_emoji} (balance: {new_balance})"
+            tax = await apply_tax(ctx, ctx.author.id, net_gain)
+            status = f"landed in {slot_labels[final_slot]} ({multiplier}x)\nyou won {net_gain} {coin_emoji} (balance: {new_balance}) (tax: {tax} {coin_emoji})"
             color = 0xf1c40f if multiplier >= 15 else 0x2ecc71
         elif net_gain == 0:
             status = f"landed in {slot_labels[final_slot]} ({multiplier}x)\nbroke even (balance: {new_balance})"
@@ -719,7 +753,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("bet must be greater than zero")
             return
 
-        bal, _ = await get_balance_checked(ctx, ctx.author.id)
+        bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal < bet and ctx.bot.user.id != 1522117141090799697:
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
@@ -735,7 +769,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("bet must be greater than zero")
             return
 
-        bal, _ = await get_balance_checked(ctx, ctx.author.id)
+        bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal < bet and ctx.bot.user.id != 1522117141090799697:
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
@@ -841,7 +875,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("amount must be greater than zero")
             return
             
-        bal, _ = await get_balance_checked(ctx, ctx.author.id)
+        bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal < amount and ctx.bot.user.id != 1522117141090799697:
             await ctx.reply(f"you don't have enough coins in your holding (holding: {bal})")
             return
@@ -858,7 +892,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("amount must be greater than zero")
             return
             
-        _, bank = await get_balance_checked(ctx, ctx.author.id)
+        _, bank, _ = await get_balance_checked(ctx, ctx.author.id)
         if bank < amount and ctx.bot.user.id != 1522117141090799697:
             await ctx.reply(f"you don't have enough coins in your bank (bank: {bank})")
             return
@@ -872,16 +906,75 @@ def setup_economy(client: commands.Bot):
     async def balance(ctx: commands.Context, user: discord.Member = None):
         target = user or ctx.author
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        bal, bank = await get_balance_checked(ctx, target.id)
+        bal, bank, debt = await get_balance_checked(ctx, target.id)
         
         embed = discord.Embed(
             title=f"Balance - {target.display_name}",
             color=0x3498db
         )
         
-        embed.description = f"**Total Balance: **{coin_emoji} `{bal + bank:,}`\n\n**Holding: **💰`{bal:,}`\n**Bank: **🏦`{bank:,}`\n\n-# birdvirus coin in the bank earn interest!"
+        debt_line = f"\n**Debt: **💳`{debt:,}`" if debt > 0 else ""
+        net = bal + bank - debt
+        embed.description = f"**Net Worth: **{coin_emoji} `{net:,}`\n\n**Holding: **💰`{bal:,}`\n**Bank: **🏦`{bank:,}`{debt_line}\n\n-# birdvirus coin in the bank earn interest!"
         
         if target.display_avatar:
             embed.set_thumbnail(url=target.display_avatar.url)
             
         await ctx.reply(embed=embed)
+
+    # Loan command
+    @client.hybrid_command(name="loan", description="take out a loan. interest is 10%")
+    @app_commands.describe(amount="how many coins to borrow")
+    async def loan(ctx: commands.Context, amount: int):
+        if amount <= 0:
+            await ctx.reply("amount must be greater than zero")
+            return
+
+        if amount > 10000:
+            await ctx.reply("max loan is 10,000 coins")
+            return
+
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        interest = int(amount * 0.1)
+        total_debt = amount + interest
+
+        await asyncio.to_thread(db.update_balance, ctx.author.id, amount)
+        new_debt = await asyncio.to_thread(db.update_debt, ctx.author.id, total_debt)
+
+        await ctx.reply(f"you took a loan of {amount} {coin_emoji} (10% interest = {interest} {coin_emoji}). total debt: {new_debt} {coin_emoji}")
+
+    # Repay command
+    @client.hybrid_command(name="repay", description="repay your debt")
+    @app_commands.describe(amount="how many coins to put toward your debt")
+    async def repay(ctx: commands.Context, amount: int):
+        if amount <= 0:
+            await ctx.reply("amount must be greater than zero")
+            return
+
+        bal, _, debt = await get_balance_checked(ctx, ctx.author.id)
+        if debt <= 0:
+            await ctx.reply("you have no debt")
+            return
+
+        if bal < amount:
+            await ctx.reply(f"you don't have enough coins in your holding (holding: {bal}, debt: {debt})")
+            return
+
+        actual = min(amount, debt)
+        await asyncio.to_thread(db.update_balance, ctx.author.id, -actual)
+        new_debt = await asyncio.to_thread(db.update_debt, ctx.author.id, -actual)
+
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        await ctx.reply(f"you repaid {actual} {coin_emoji} of your debt. remaining debt: {new_debt} {coin_emoji}")
+
+    # Debt check command
+    @client.hybrid_command(name="debt", description="check your debt")
+    async def debt_cmd(ctx: commands.Context):
+        _, _, debt = await get_balance_checked(ctx, ctx.author.id)
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        if debt <= 0:
+            await ctx.reply(f"you have no debt {coin_emoji}")
+        else:
+            bal, bank, _ = await get_balance_checked(ctx, ctx.author.id)
+            net = bal + bank - debt
+            await ctx.reply(f"your debt: {debt} {coin_emoji} | holding: {bal} | bank: {bank} | net worth: {net} {coin_emoji}")
