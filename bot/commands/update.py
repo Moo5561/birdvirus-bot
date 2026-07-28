@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import discord
 import discord.ext.commands as commands
 from discord import app_commands
@@ -7,6 +8,8 @@ import sys
 import subprocess
 import pathlib
 from bot.commands import is_bot_dev
+
+log = logging.getLogger(__name__)
 
 SNAPSHOT_FILE = "update_snapshot.txt"
 
@@ -44,6 +47,7 @@ def setup_update(client: commands.Bot):
     )
     @is_bot_dev()
     async def update_cmd(ctx: commands.Context):
+        log.info("update command invoked by %s (id=%s)", ctx.author, ctx.author.id)
         head_before = get_current_head()
         if not head_before:
             await ctx.reply("could not determine current HEAD")
@@ -117,6 +121,7 @@ def setup_update(client: commands.Bot):
 
     @update_cmd.error
     async def update_cmd_error(ctx: commands.Context, error):
+        log.error("update command failed: %s", error)
         if isinstance(error, commands.CheckFailure):
             await ctx.reply("you don't have permission to use this command")
         else:
