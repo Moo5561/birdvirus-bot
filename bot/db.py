@@ -25,13 +25,20 @@ def init_db():
         CREATE TABLE IF NOT EXISTS economy (
             user_id INTEGER PRIMARY KEY,
             balance INTEGER DEFAULT 100,
-            bank INTEGER DEFAULT 0
+            bank INTEGER DEFAULT 0,
+            debt INTEGER DEFAULT 0
         )
     """)
 
     # add bank column to existing dbs
     try:
         cursor.execute("ALTER TABLE economy ADD COLUMN bank INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+
+    # add debt column to existing dbs
+    try:
+        cursor.execute("ALTER TABLE economy ADD COLUMN debt INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
 
@@ -167,22 +174,23 @@ def clear_say_logs():
 
 
 # Economy Functions
-def get_balances(user_id: int) -> tuple[int, int]:
+def get_balances(user_id: int) -> tuple[int, int, int]:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT balance, bank FROM economy WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT balance, bank, debt FROM economy WHERE user_id = ?", (user_id,))
     row = cursor.fetchone()
     if row is None:
         cursor.execute(
-            "INSERT INTO economy (user_id, balance, bank) VALUES (?, 100, 0)",
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, 100, 0, 0)",
             (user_id,),
         )
         conn.commit()
-        balance, bank = 100, 0
+        balance, bank, debt = 100, 0, 0
     else:
         balance, bank = row[0], row[1]
+        debt = row[2] or 0
     conn.close()
-    return balance, bank
+    return balance, bank, debt
 
 
 def get_balance(user_id: int) -> int:
@@ -207,7 +215,7 @@ def set_balance(user_id: int, amount: int):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO economy (user_id, balance, bank) VALUES (?, ?, 0) ON CONFLICT(user_id) DO UPDATE SET balance = ?",
+        "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, ?, 0, 0) ON CONFLICT(user_id) DO UPDATE SET balance = ?",
         (user_id, amount, amount),
     )
     conn.commit()
@@ -218,7 +226,7 @@ def set_bank(user_id: int, amount: int):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO economy (user_id, balance, bank) VALUES (?, 100, ?) ON CONFLICT(user_id) DO UPDATE SET bank = ?",
+        "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, 100, ?, 0) ON CONFLICT(user_id) DO UPDATE SET bank = ?",
         (user_id, amount, amount),
     )
     conn.commit()
@@ -233,7 +241,7 @@ def update_balance(user_id: int, change: int) -> int:
     if row is None:
         new_balance = 100 + change
         cursor.execute(
-            "INSERT INTO economy (user_id, balance, bank) VALUES (?, ?, 0)",
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, ?, 0, 0)",
             (user_id, new_balance),
         )
     else:
@@ -254,7 +262,7 @@ def update_bank(user_id: int, change: int) -> int:
     if row is None:
         new_bank = change
         cursor.execute(
-            "INSERT INTO economy (user_id, balance, bank) VALUES (?, 100, ?)",
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, 100, ?, 0)",
             (user_id, new_bank),
         )
     else:
@@ -266,13 +274,62 @@ def update_bank(user_id: int, change: int) -> int:
     conn.close()
     return new_bank
 
+def get_debt(user_id: int) -> int:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT debt FROM economy WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    if row is None:
+        cursor.execute("INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, 100, 0, 0)", (user_id,))
+        conn.commit()
+        conn.close()
+        return 0
+    debt = row[0] or 0
+    conn.close()
+    return debt
+
+def set_debt(user_id: int, amount: int):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, 100, 0, ?) ON CONFLICT(user_id) DO UPDATE SET debt = ?",
+        (user_id, amount, amount),
+    )
+    conn.commit()
+    conn.close()
+
+def update_debt(user_id: int, change: int) -> int:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT debt FROM economy WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    if row is None:
+        new_debt = change
+        cursor.execute("INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, 100, 0, ?)", (user_id, abs(change) if change < 0 else 0))
+    else:
+        new_debt = (row[0] or 0) + change
+        if new_debt < 0:
+            new_debt = 0
+        cursor.execute("UPDATE economy SET debt = ? WHERE user_id = ?", (new_debt, user_id))
+    conn.commit()
+    conn.close()
+    return new_debt
+
 def get_all_balances() -> list[dict]:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT user_id, balance, bank FROM economy ORDER BY (balance + bank) DESC")
+    cursor.execute("SELECT user_id, balance, bank, debt FROM economy ORDER BY (balance + bank - debt) DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"user_id": row[0], "balance": row[1], "bank": row[2]} for row in rows]
+    return [{"user_id": row[0], "balance": row[1], "bank": row[2], "debt": row[3] or 0} for row in rows]
+
+def get_all_debts() -> list[dict]:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id, debt, balance, bank FROM economy WHERE debt > 0 ORDER BY debt DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"user_id": row[0], "debt": row[1], "balance": row[2], "bank": row[3]} for row in rows]
 
 
 # Config Functions (Emoji, Properties channel, etc)
