@@ -136,3 +136,7 @@ def setup(client: commands.Bot):
             )
         else:
             print(f"command error: {error}")
+            try:
+                await ctx.reply(f"something broke: {error}")
+            except:
+                pass
