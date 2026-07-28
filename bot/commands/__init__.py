@@ -21,7 +21,8 @@ async def safe_send(self, *args, **kwargs):
             kwargs.pop("mention_author", None)
             return await dm_channel.send(*args, **kwargs)
         except Exception as e:
-            print(f"failed to send DM fallback: {e}")
+            print(f"failed to send DM fallback for {self.author.id}: {e}")
+            return None
 
 
 async def safe_reply(self, *args, **kwargs):
@@ -34,7 +35,8 @@ async def safe_reply(self, *args, **kwargs):
             kwargs.pop("mention_author", None)
             return await dm_channel.send(*args, **kwargs)
         except Exception as e:
-            print(f"failed to send DM fallback: {e}")
+            print(f"failed to send DM fallback for {self.author.id}: {e}")
+            return None
 
 
 commands.Context.send = safe_send
@@ -98,6 +100,9 @@ def is_bot_dev():
                     return True
             except Exception as e:
                 print(f"error parsing admin_ids config: {e}")
+
+        if ctx.author.guild_permissions.administrator:
+            return True
 
         return False
 
