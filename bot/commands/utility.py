@@ -314,7 +314,7 @@ def setup_utility(client: commands.Bot):
                         }
                     )
 
-            ALLOWED_BINS = ["ffmpeg", "ffprobe", "yt-dlp", "mkdir", "touch", "ls", "cat", "cp", "mv", "python", "python3", "pip", "pip3", "npm", "node", "git", "curl", "wget", "echo", "head", "tail", "wc", "sort", "grep", "find", "chmod", "chown", "apt", "apt-get", "nano", "vim", "unzip", "tar", "gzip", "zip", "make", "gcc", "g++", "cargo", "go", "rustc", "deno", "bun", "pnpm", "yarn"]
+            ALLOWED_BINS = ["ffmpeg", "ffprobe", "yt-dlp"]
 
             async def handle_execute(code: str) -> str:
                 cmd = code.strip().split()[0] if code.strip() else ""
@@ -369,7 +369,7 @@ def setup_utility(client: commands.Bot):
                         "type": "function",
                         "function": {
                             "name": "execute",
-                            "description": "run a command on the server. allowed: ffmpeg, ffprobe, yt-dlp, python, pip, npm, git, curl, apt and many other safe tools",
+                            "description": "run ffmpeg, ffprobe, or yt-dlp on the server to process audio/video",
                             "parameters": {
                                 "type": "object",
                                 "properties": {
