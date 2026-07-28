@@ -37,10 +37,12 @@ def init_db():
         pass
 
     # add debt column to existing dbs
-    try:
-        cursor.execute("ALTER TABLE economy ADD COLUMN debt INTEGER DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
+    for attempt in range(3):
+        try:
+            cursor.execute("ALTER TABLE economy ADD COLUMN debt INTEGER DEFAULT 0")
+            break
+        except sqlite3.OperationalError:
+            pass
 
     # config table
     cursor.execute("""
@@ -177,7 +179,15 @@ def clear_say_logs():
 def get_balances(user_id: int) -> tuple[int, int, int]:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT balance, bank, debt FROM economy WHERE user_id = ?", (user_id,))
+    try:
+        cursor.execute("SELECT balance, bank, debt FROM economy WHERE user_id = ?", (user_id,))
+    except sqlite3.OperationalError:
+        conn.close()
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("ALTER TABLE economy ADD COLUMN debt INTEGER DEFAULT 0")
+        conn.commit()
+        cursor.execute("SELECT balance, bank, debt FROM economy WHERE user_id = ?", (user_id,))
     row = cursor.fetchone()
     if row is None:
         cursor.execute(
