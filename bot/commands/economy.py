@@ -4,7 +4,7 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
-from bot.commands import is_admin, game_lock, game_unlock
+from bot.commands import is_admin, game_lock, game_unlock, _s
 from bot.commands.blackjack import BlackjackView, draw_card
 from bot.commands.horserace import HorseRaceView
 from bot.commands.catrace import CatRaceView
@@ -90,9 +90,9 @@ async def build_leaderboard_embed(ctx, all_users, page, total_pages, coin_emoji)
         total = user["balance"] + user["bank"]
         lines.append(
             f"{medal} **{name}**\n"
-            f"┣ total: {coin_emoji} `{total:,}`\n"
-            f"┣ holding: 💰 `{user['balance']:,}`\n"
-            f"┗ bank: 🏦 `{user['bank']:,}`"
+            f"┣ total: {coin_emoji} `{_s(total)}`\n"
+            f"┣ holding: 💰 `{_s(user['balance'])}`\n"
+            f"┗ bank: 🏦 `{_s(user['bank'])}`"
         )
 
     embed = discord.Embed(
@@ -947,9 +947,9 @@ def setup_economy(client: commands.Bot):
             color=0x3498db
         )
         
-        debt_line = f"\n**Debt: **💳`{debt:,}`" if debt > 0 else ""
+        debt_line = f"\n**Debt: **💳`{_s(debt)}`" if debt > 0 else ""
         net = bal + bank - debt
-        embed.description = f"**Net Worth: **{coin_emoji} `{net:,}`\n\n**Holding: **💰`{bal:,}`\n**Bank: **🏦`{bank:,}`{debt_line}\n\n-# birdvirus coin in the bank earn interest!"
+        embed.description = f"**Net Worth: **{coin_emoji} `{_s(net)}`\n\n**Holding: **💰`{_s(bal)}`\n**Bank: **🏦`{_s(bank)}`{debt_line}\n\n-# birdvirus coin in the bank earn interest!"
         
         if target.display_avatar:
             embed.set_thumbnail(url=target.display_avatar.url)

@@ -5,7 +5,7 @@ import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
 import os
-from bot.commands import is_admin, is_bot_dev
+from bot.commands import is_admin, is_bot_dev, _s
 from bot.commands.economy import _to_bet
 
 async def check_if_dev(user_id):
@@ -356,7 +356,7 @@ def setup_admin(client: commands.Bot):
         rate = await asyncio.to_thread(db.get_config, "tax_rate", "0")
         collected = await asyncio.to_thread(db.get_config, "tax_collected", "0")
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        await ctx.reply(f"tax rate: {rate}% | total collected: {int(collected):,} {coin_emoji}")
+        await ctx.reply(f"tax rate: {rate}% | total collected: {_s(int(collected))} {coin_emoji}")
 
     @ec_debtforgive_command := ec_group.command(name="debtforgive", description="forgive a user's debt (admin only)")
     @is_admin()
@@ -374,5 +374,5 @@ def setup_admin(client: commands.Bot):
         if not debts:
             await ctx.reply("no one has debt")
             return
-        lines = [f"<@{d['user_id']}>: {d['debt']:,} debt (holding: {d['balance']:,}, bank: {d['bank']:,})" for d in debts[:20]]
+        lines = [f"<@{d['user_id']}>: {_s(d['debt'])} debt (holding: {_s(d['balance'])}, bank: {_s(d['bank'])})" for d in debts[:20]]
         await ctx.reply("### debts\n" + "\n".join(lines))

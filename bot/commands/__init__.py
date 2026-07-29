@@ -118,6 +118,23 @@ def is_bot_dev():
     return commands.check(predicate)
 
 
+def _s(num):
+    """abbreviate a number: 1234 -> 1.2k, 5678900 -> 5.7m, huge -> 3.9e+81"""
+    if num >= 1_000_000_000_000_000:
+        return f"{num:.15e}"
+    if num >= 1_000_000_000:
+        s = f"{num / 1_000_000_000:.1f}b"
+    elif num >= 1_000_000:
+        s = f"{num / 1_000_000:.1f}m"
+    elif num >= 1_000:
+        s = f"{num / 1_000:.1f}k"
+    else:
+        s = str(num)
+    if s.endswith(".0") and s[-3].isdigit():
+        s = s[:-2]
+    return s
+
+
 from .blackjack import setup_blackjack
 from .voice import setup_voice
 from .economy import setup_economy
