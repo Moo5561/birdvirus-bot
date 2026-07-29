@@ -62,9 +62,11 @@ def setup_update(client: commands.Bot):
 
         await ctx.reply("pulling latest code...")
 
+        subprocess.run(["git", "rm", "--cached", "birdvirus.db"], capture_output=True, timeout=10)
+
         try:
             result = subprocess.run(
-                ["git", "pull"], capture_output=True, text=True, timeout=30
+                ["git", "pull", "--autostash"], capture_output=True, text=True, timeout=30
             )
             output = result.stdout + result.stderr
         except Exception as e:
