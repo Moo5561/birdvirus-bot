@@ -5,6 +5,13 @@ import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
 
+
+def _payout(bet, mult):
+    if type(mult) is int:
+        return bet * mult
+    n, d = mult.as_integer_ratio()
+    return bet * n // d
+
 HORSES = [
     {"name": "bolt", "emoji": "🐎", "min_roll": 2, "max_roll": 4, "odds": 2.0, "desc": "lightning fast, never misses a step"},
     {"name": "shadow", "emoji": "🐴", "min_roll": 1, "max_roll": 3, "odds": 2.5, "desc": "steady and silent, a reliable pick"},
@@ -196,7 +203,7 @@ class HorseRaceView(discord.ui.View):
         # payout
         won = (winner_idx == self.selected_horse_idx)
         if won:
-            net_gain = int(self.bet * self.horses[winner_idx]["odds"]) - self.bet
+            net_gain = _payout(self.bet, self.horses[winner_idx]["odds"]) - self.bet
         else:
             net_gain = -self.bet
 

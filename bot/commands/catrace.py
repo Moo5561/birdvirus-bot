@@ -5,6 +5,13 @@ import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
 
+
+def _payout(bet, mult):
+    if type(mult) is int:
+        return bet * mult
+    n, d = mult.as_integer_ratio()
+    return bet * n // d
+
 CATS = [
     {
         "name": "whiskers",
@@ -305,7 +312,7 @@ class CatRaceView(discord.ui.View):
         # payout
         won = winner_idx == self.selected_cat_idx
         if won:
-            net_gain = int(self.bet * self.cats[winner_idx]["odds"]) - self.bet
+            net_gain = _payout(self.bet, self.cats[winner_idx]["odds"]) - self.bet
         else:
             net_gain = -self.bet
 

@@ -9,6 +9,14 @@ from bot.commands.blackjack import BlackjackView, draw_card
 from bot.commands.horserace import HorseRaceView
 from bot.commands.catrace import CatRaceView
 
+
+def _payout(bet, mult):
+    """exact integer multiplication, no float precision loss."""
+    if type(mult) is int:
+        return bet * mult
+    n, d = mult.as_integer_ratio()
+    return bet * n // d
+
 async def get_balance_checked(ctx, user_id):
     if ctx.bot.user and ctx.bot.user.id == 1522117141090799697:
         return 999999999999999999999999999, 999999999999999999999999999, 0
@@ -178,7 +186,7 @@ class BirdvirusGameView(discord.ui.View):
             
             if guess == self.correct_count:
                 multiplier = 5 
-                net_gain = int(self.bet * multiplier) - self.bet
+                net_gain = _payout(self.bet, multiplier) - self.bet
                 new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, net_gain)
                 tax = await apply_tax(self.ctx, self.ctx.author.id, net_gain)
                 status = f"correct! there were {self.correct_count} infected birds. you won {net_gain} {self.coin_emoji} (balance: {new_balance}) (tax: {tax} {self.coin_emoji})"
@@ -278,7 +286,7 @@ def setup_economy(client: commands.Bot):
             if dealer_total == 21:
                 await ctx.reply(f"both got natural blackjack! it's a tie. bet refunded")
             else:
-                payout = int(bet * 1.5)
+                payout = _payout(bet, 1.5)
                 new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, payout)
                 tax = await apply_tax(ctx, ctx.author.id, payout)
                 await ctx.reply(f"natural blackjack! you won {payout} {coin_emoji} (balance: {new_balance}) (tax: {tax} {coin_emoji})")
@@ -353,10 +361,10 @@ def setup_economy(client: commands.Bot):
             status = "no match. unlucky!"
             
         if multiplier > 0:
-            net_gain = int(bet * multiplier) - bet
+            net_gain = _payout(bet, multiplier) - bet
         else:
             net_gain = -bet
-            
+
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
         
         if net_gain > 0:
@@ -471,12 +479,12 @@ def setup_economy(client: commands.Bot):
                 multiplier = 2
                 
         if win:
-            net_gain = int(bet * multiplier) - bet
+            net_gain = _payout(bet, multiplier) - bet
         else:
             net_gain = -bet
-            
+
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
-        
+
         if win:
             tax = await apply_tax(ctx, ctx.author.id, net_gain)
             status_text = f"the ball landed on {result_color_emoji} {spin_result}!\nyou won {net_gain} {coin_emoji}! (balance: {new_balance}) (tax: {tax} {coin_emoji})"
@@ -523,7 +531,7 @@ def setup_economy(client: commands.Bot):
             status = "NATURAL 20! INSANE SUCCESS! 20x your bet!"
             
         if multiplier < 0:
-            net_gain = int(bet * multiplier) # -5x
+            net_gain = _payout(bet, multiplier) # -5x
             # check if we need to drain bank
             if bal + bank < abs(net_gain):
                 net_gain = -(bal + bank) # drain everything
@@ -538,7 +546,7 @@ def setup_economy(client: commands.Bot):
             net_gain = -bet
             new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
         else:
-            net_gain = int(bet * multiplier) - bet
+            net_gain = _payout(bet, multiplier) - bet
             new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
             tax = await apply_tax(ctx, ctx.author.id, net_gain)
             
@@ -652,7 +660,7 @@ def setup_economy(client: commands.Bot):
         slots_row = ' '.join(slot_labels)
         mults_row = '15x 5x 2x .5 2x 5x 15x'
 
-        net_gain = int(bet * multiplier) - bet
+        net_gain = _payout(bet, multiplier) - bet
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
 
         if net_gain > 0:
@@ -731,7 +739,7 @@ def setup_economy(client: commands.Bot):
         slots_row = ' '.join(slot_labels)
         mults_row = '50x 15x 3x .3 .3 3x 15x 50x'
 
-        net_gain = int(bet * multiplier) - bet
+        net_gain = _payout(bet, multiplier) - bet
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
 
         if net_gain > 0:
