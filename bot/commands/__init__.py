@@ -127,6 +127,7 @@ from .horserace import setup_horserace
 from .catrace import setup_catrace
 from .job import setup_job
 from .update import setup_update
+from .shop import setup_shop
 
 
 def setup(client: commands.Bot):
@@ -139,3 +140,4 @@ def setup(client: commands.Bot):
     setup_utility(client)
     setup_job(client)
     setup_update(client)
+    setup_shop(client)

@@ -8,6 +8,7 @@ from bot.commands import is_admin, game_lock, game_unlock
 from bot.commands.blackjack import BlackjackView, draw_card
 from bot.commands.horserace import HorseRaceView
 from bot.commands.catrace import CatRaceView
+from bot.commands.shop import ACTIVE_CHEATS
 
 
 def _payout(bet, mult):
@@ -333,6 +334,11 @@ def setup_economy(client: commands.Bot):
         await asyncio.sleep(0.8)
         
         reels = [random.choice(emojis) for _ in range(3)]
+
+        cheat = ACTIVE_CHEATS.pop(ctx.author.id, None)
+        if cheat and cheat.get("type") == "slot_cheat":
+            match = random.choice(emojis)
+            reels = [match, match, match]
         unique_count = len(set(reels))
         
         if unique_count == 1:
@@ -514,6 +520,10 @@ def setup_economy(client: commands.Bot):
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "dYT")
         
         roll = random.randint(1, 20)
+
+        cheat = ACTIVE_CHEATS.pop(ctx.author.id, None)
+        if cheat and cheat.get("type") == "rigged_dice":
+            roll = 20
         
         if roll == 1:
             multiplier = -5
@@ -774,7 +784,9 @@ def setup_economy(client: commands.Bot):
 
         game_lock(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        view = HorseRaceView(ctx, bet, coin_emoji, game_unlock)
+        cheat = ACTIVE_CHEATS.pop(ctx.author.id, None)
+        boost = cheat["value"] if (cheat and cheat.get("type") == "race_boost") else 0
+        view = HorseRaceView(ctx, bet, coin_emoji, game_unlock, cheat_boost=boost)
         await view.start(ctx)
 
     @pure_catrace_command := pure_group.command(name="catrace", description="bet on a cat race at the birdvirus track")
@@ -790,7 +802,9 @@ def setup_economy(client: commands.Bot):
 
         game_lock(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        view = CatRaceView(ctx, bet, coin_emoji, game_unlock)
+        cheat = ACTIVE_CHEATS.pop(ctx.author.id, None)
+        boost = cheat["value"] if (cheat and cheat.get("type") == "race_boost") else 0
+        view = CatRaceView(ctx, bet, coin_emoji, game_unlock, cheat_boost=boost)
         await view.start(ctx)
 
     @client.hybrid_command(name="leaderboard", description="view the richest players")
@@ -868,9 +882,12 @@ def setup_economy(client: commands.Bot):
         
         weights = [f["weight"] for f in fish_types]
         caught = random.choices(fish_types, weights=weights, k=1)[0]
+
+        cheat = ACTIVE_CHEATS.pop(ctx.author.id, None)
+        fish_mult = cheat["value"] if (cheat and cheat.get("type") == "fish_boost") else 1
         
         if caught["max"] > 0:
-            amount = random.randint(caught["min"], caught["max"])
+            amount = random.randint(caught["min"], caught["max"]) * fish_mult
             new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, amount)
             await ctx.reply(f"you cast your line and caught a {caught['emoji']} {caught['name']}! you sold it for {amount} {coin_emoji} (balance: {new_balance})")
         else:

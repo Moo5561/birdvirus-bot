@@ -4,6 +4,7 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
+from bot.commands.shop import ACTIVE_CHEATS
 from datetime import datetime, timedelta
 from typing import Literal
 
@@ -146,6 +147,10 @@ async def handle_job_reward(ctx, job_name, job_data, success, game_message, cust
             time_bonus_text = f"\n⏱️ **average speed.** took {adjusted_time:.1f}s (ping adjusted)."
 
     xp_gain = random.randint(15, 30)
+
+    cheat = ACTIVE_CHEATS.pop(ctx.author.id, None)
+    if cheat and cheat.get("type") == "xp_boost":
+        xp_gain *= cheat["value"]
     
     # Handle random event
     event_payout, event_desc = await trigger_random_event(ctx, job_name, level)

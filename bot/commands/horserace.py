@@ -30,7 +30,7 @@ def render_progress_bar(position: int, track_length: int = TRACK_LENGTH) -> str:
 
 
 class HorseRaceView(discord.ui.View):
-    def __init__(self, ctx: commands.Context, bet: int, coin_emoji: str, game_unlock=None):
+    def __init__(self, ctx: commands.Context, bet: int, coin_emoji: str, game_unlock=None, cheat_boost=0):
         super().__init__(timeout=60.0)
         self.ctx = ctx
         self.bet = bet
@@ -38,6 +38,7 @@ class HorseRaceView(discord.ui.View):
         self._game_unlock = game_unlock
         self.message: discord.Message | None = None
         self.selected_horse_idx: int | None = None
+        self.cheat_boost = cheat_boost
         self.horses = list(HORSES)
 
         options = []
@@ -175,6 +176,8 @@ class HorseRaceView(discord.ui.View):
             for i, horse in enumerate(self.horses):
                 if positions[i] < TRACK_LENGTH:
                     roll = random.randint(horse["min_roll"], horse["max_roll"])
+                    if i == self.selected_horse_idx:
+                        roll += self.cheat_boost
                     # stumble / sprint mechanics
                     chance = random.random()
                     if chance < 0.05:

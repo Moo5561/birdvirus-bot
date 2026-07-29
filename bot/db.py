@@ -88,6 +88,16 @@ def init_db():
         )
     """)
 
+    # user items table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_items (
+            user_id INTEGER,
+            item TEXT,
+            quantity INTEGER DEFAULT 1,
+            PRIMARY KEY (user_id, item)
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -534,6 +544,66 @@ def update_job_time(user_id: int, time_str: str):
     )
     conn.commit()
     conn.close()
+
+
+# User Items Functions
+def add_item(user_id: int, item: str, quantity: int = 1):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO user_items (user_id, item, quantity) VALUES (?, ?, ?) ON CONFLICT(user_id, item) DO UPDATE SET quantity = quantity + ?",
+        (user_id, item, quantity, quantity),
+    )
+    conn.commit()
+    conn.close()
+
+
+def remove_item(user_id: int, item: str, quantity: int = 1):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT quantity FROM user_items WHERE user_id = ? AND item = ?",
+        (user_id, item),
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return
+    new_qty = row[0] - quantity
+    if new_qty <= 0:
+        cursor.execute(
+            "DELETE FROM user_items WHERE user_id = ? AND item = ?", (user_id, item)
+        )
+    else:
+        cursor.execute(
+            "UPDATE user_items SET quantity = ? WHERE user_id = ? AND item = ?",
+            (new_qty, user_id, item),
+        )
+    conn.commit()
+    conn.close()
+
+
+def get_items(user_id: int) -> dict:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT item, quantity FROM user_items WHERE user_id = ?", (user_id,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return {row[0]: row[1] for row in rows}
+
+
+def has_item(user_id: int, item: str) -> bool:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT 1 FROM user_items WHERE user_id = ? AND item = ? AND quantity > 0",
+        (user_id, item),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return row is not None
 
 
 init_db()

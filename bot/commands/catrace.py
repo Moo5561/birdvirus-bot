@@ -97,7 +97,7 @@ def cat_event(roll: int, cat: dict, tick: int) -> tuple[int, str]:
 
 
 class CatRaceView(discord.ui.View):
-    def __init__(self, ctx: commands.Context, bet: int, coin_emoji: str, game_unlock=None):
+    def __init__(self, ctx: commands.Context, bet: int, coin_emoji: str, game_unlock=None, cheat_boost=0):
         super().__init__(timeout=60.0)
         self.ctx = ctx
         self.bet = bet
@@ -105,6 +105,7 @@ class CatRaceView(discord.ui.View):
         self._game_unlock = game_unlock
         self.message: discord.Message | None = None
         self.selected_cat_idx: int | None = None
+        self.cheat_boost = cheat_boost
         self.cats = list(CATS)
 
         options = []
@@ -273,6 +274,8 @@ class CatRaceView(discord.ui.View):
             for i, cat in enumerate(self.cats):
                 if positions[i] < TRACK_LENGTH:
                     roll = random.randint(cat["min_roll"], cat["max_roll"])
+                    if i == self.selected_cat_idx:
+                        roll += self.cheat_boost
                     modified_roll, event_msg = cat_event(roll, cat, tick)
                     positions[i] += modified_roll
                     if event_msg:
