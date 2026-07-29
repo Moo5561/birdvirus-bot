@@ -243,6 +243,9 @@ def set_bank(user_id: int, amount: int):
     conn.close()
 
 
+SQLITE_MAX = 9223372036854775807
+
+
 def update_balance(user_id: int, change: int) -> int:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -250,12 +253,29 @@ def update_balance(user_id: int, change: int) -> int:
     row = cursor.fetchone()
     if row is None:
         new_balance = 100 + change
+        is_new = True
+    else:
+        new_balance = row[0] + change
+        is_new = False
+
+    if new_balance > SQLITE_MAX:
+        overflow = new_balance - SQLITE_MAX
+        new_balance = SQLITE_MAX
+        r = cursor.execute(
+            "SELECT value FROM config WHERE key = 'tax_collected'"
+        ).fetchone()
+        collected = int(r[0]) if r else 0
+        cursor.execute(
+            "INSERT INTO config (key, value) VALUES ('tax_collected', ?) ON CONFLICT(key) DO UPDATE SET value = ?",
+            (str(collected + overflow), str(collected + overflow)),
+        )
+
+    if is_new:
         cursor.execute(
             "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, ?, 0, 0)",
             (user_id, new_balance),
         )
     else:
-        new_balance = row[0] + change
         cursor.execute(
             "UPDATE economy SET balance = ? WHERE user_id = ?", (new_balance, user_id)
         )
@@ -271,12 +291,29 @@ def update_bank(user_id: int, change: int) -> int:
     row = cursor.fetchone()
     if row is None:
         new_bank = change
+        is_new = True
+    else:
+        new_bank = (row[0] or 0) + change
+        is_new = False
+
+    if new_bank > SQLITE_MAX:
+        overflow = new_bank - SQLITE_MAX
+        new_bank = SQLITE_MAX
+        r = cursor.execute(
+            "SELECT value FROM config WHERE key = 'tax_collected'"
+        ).fetchone()
+        collected = int(r[0]) if r else 0
+        cursor.execute(
+            "INSERT INTO config (key, value) VALUES ('tax_collected', ?) ON CONFLICT(key) DO UPDATE SET value = ?",
+            (str(collected + overflow), str(collected + overflow)),
+        )
+
+    if is_new:
         cursor.execute(
             "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, 100, ?, 0)",
             (user_id, new_bank),
         )
     else:
-        new_bank = (row[0] or 0) + change
         cursor.execute(
             "UPDATE economy SET bank = ? WHERE user_id = ?", (new_bank, user_id)
         )
