@@ -42,7 +42,7 @@ all commands are hybrid (slash + prefix). prefix is `%` for the main bot, `ht!` 
 
 | category | commands |
 |----------|----------|
-| economy | `/pure chance`, `/pure blackjack`, `/pure slots`, `/pure roulette`, `/pure insaneroll`, `/pure birdvirus`, `/pure plinko`, `/pure horse`, `/beg`, `/fish`, `/deposit`, `/withdraw`, `/balance` |
+| economy | `/pure chance`, `/pure blackjack`, `/pure slots`, `/pure roulette`, `/pure insaneroll`, `/pure birdvirus`, `/pure plinko`, `/pure plinkohard`, `/pure horse`, `/beg`, `/fish`, `/deposit`, `/withdraw`, `/balance` |
 | voice | `/vc join`, `/vc leave`, `/vc stop`, `/vc bird`, `/vc droid`, `/stop`, `/play`, `/bad apple` |
 | jobs | `/job list`, `/job info`, `/job apply`, `/job work`, `/job quit`, `/job beg` |
 | properties | `/property register`, `/property buy`, `/property remove`, `/property invite`, `/property kick` |
