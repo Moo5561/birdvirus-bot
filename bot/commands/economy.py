@@ -17,6 +17,17 @@ def _payout(bet, mult):
     n, d = mult.as_integer_ratio()
     return bet * n // d
 
+
+def _to_bet(val):
+    """convert string bet to int, supports arbitrarily large numbers."""
+    try:
+        v = int(val)
+    except (ValueError, TypeError):
+        raise commands.BadArgument("bet must be a valid integer")
+    if v <= 0:
+        raise commands.BadArgument("bet must be greater than zero")
+    return v
+
 async def get_balance_checked(ctx, user_id):
     if ctx.bot.user and ctx.bot.user.id == 1522117141090799697:
         return 999999999999999999999999999, 999999999999999999999999999, 0
@@ -234,10 +245,8 @@ def setup_economy(client: commands.Bot):
     @pure_chance_command := pure_group.command(name="chance", description="gamble your coins on pure chance")
     @app_commands.describe(bet="amount of coins to bet")
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def pure_chance(ctx: commands.Context, bet: int):
-        if bet <= 0:
-            await ctx.reply("bet must be greater than zero")
-            return
+    async def pure_chance(ctx: commands.Context, bet: str):
+        bet = _to_bet(bet)
             
         bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal < bet and ctx.bot.user.id != 1522117141090799697:
@@ -259,10 +268,8 @@ def setup_economy(client: commands.Bot):
     @pure_blackjack_command := pure_group.command(name="blackjack", description="play a game of blackjack against the dealer")
     @app_commands.describe(bet="the amount of coins to bet")
     @commands.cooldown(1, 10, commands.BucketType.user)
-    async def pure_blackjack(ctx: commands.Context, bet: int):
-        if bet <= 0:
-            await ctx.reply("bet must be greater than zero")
-            return
+    async def pure_blackjack(ctx: commands.Context, bet: str):
+        bet = _to_bet(bet)
             
         balance_val = await asyncio.to_thread(db.get_balance, ctx.author.id)
         if balance_val < bet:
@@ -298,10 +305,8 @@ def setup_economy(client: commands.Bot):
     @pure_slots_command := pure_group.command(name="slots", description="play slots and try to win big")
     @app_commands.describe(bet="the amount of coins to bet")
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def pure_slots(ctx: commands.Context, bet: int):
-        if bet <= 0:
-            await ctx.reply("bet must be greater than zero")
-            return
+    async def pure_slots(ctx: commands.Context, bet: str):
+        bet = _to_bet(bet)
             
         bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal < bet and ctx.bot.user.id != 1522117141090799697:
@@ -385,10 +390,8 @@ def setup_economy(client: commands.Bot):
         guess="where to bet: red, black, even, odd, high (19-36), low (1-18), or a specific number (0-36)"
     )
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def pure_roulette(ctx: commands.Context, bet: int, guess: str):
-        if bet <= 0:
-            await ctx.reply("bet must be greater than zero")
-            return
+    async def pure_roulette(ctx: commands.Context, bet: str, guess: str):
+        bet = _to_bet(bet)
             
         bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal < bet and ctx.bot.user.id != 1522117141090799697:
@@ -500,10 +503,8 @@ def setup_economy(client: commands.Bot):
     @pure_insaneroll_command := pure_group.command(name="insaneroll", description="roll a d20 with insane stakes")
     @app_commands.describe(bet="the amount of coins to bet")
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def pure_insaneroll(ctx: commands.Context, bet: int):
-        if bet <= 0:
-            await ctx.reply("bet must be greater than zero")
-            return
+    async def pure_insaneroll(ctx: commands.Context, bet: str):
+        bet = _to_bet(bet)
             
         bal, bank, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal < bet and ctx.bot.user.id != 1522117141090799697:
@@ -562,10 +563,8 @@ def setup_economy(client: commands.Bot):
 
     @pure_birdvirus_command := pure_group.command(name="birdvirus", description="guess how many birds have the virus")
     @app_commands.describe(bet="amount of coins to bet")
-    async def pure_birdvirus(ctx: commands.Context, bet: int):
-        if bet <= 0:
-            await ctx.reply("bet must be greater than zero")
-            return
+    async def pure_birdvirus(ctx: commands.Context, bet: str):
+        bet = _to_bet(bet)
 
         bal_val, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal_val < bet and ctx.bot.user.id != 1522117141090799697:
@@ -612,10 +611,8 @@ def setup_economy(client: commands.Bot):
     @pure_plinko_command := pure_group.command(name="plinko", description="drop the ball down the plinko board")
     @app_commands.describe(bet="amount of coins to bet")
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def pure_plinko(ctx: commands.Context, bet: int):
-        if bet <= 0:
-            await ctx.reply("bet must be greater than zero")
-            return
+    async def pure_plinko(ctx: commands.Context, bet: str):
+        bet = _to_bet(bet)
 
         bal_val, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal_val < bet and ctx.bot.user.id != 1522117141090799697:
@@ -690,10 +687,8 @@ def setup_economy(client: commands.Bot):
     @pure_plinkohard_command := pure_group.command(name="plinkohard", description="HARD MODE plinko - higher risk, higher reward")
     @app_commands.describe(bet="amount of coins to bet")
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def pure_plinkohard(ctx: commands.Context, bet: int):
-        if bet <= 0:
-            await ctx.reply("bet must be greater than zero")
-            return
+    async def pure_plinkohard(ctx: commands.Context, bet: str):
+        bet = _to_bet(bet)
 
         bal_val, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal_val < bet and ctx.bot.user.id != 1522117141090799697:
@@ -769,10 +764,8 @@ def setup_economy(client: commands.Bot):
     @pure_horse_command := pure_group.command(name="horse", description="bet on a horse race at the birdvirus track")
     @app_commands.describe(bet="the amount of coins to bet")
     @commands.cooldown(1, 10, commands.BucketType.user)
-    async def pure_horse(ctx: commands.Context, bet: int):
-        if bet <= 0:
-            await ctx.reply("bet must be greater than zero")
-            return
+    async def pure_horse(ctx: commands.Context, bet: str):
+        bet = _to_bet(bet)
 
         bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal < bet and ctx.bot.user.id != 1522117141090799697:
@@ -787,10 +780,8 @@ def setup_economy(client: commands.Bot):
     @pure_catrace_command := pure_group.command(name="catrace", description="bet on a cat race at the birdvirus track")
     @app_commands.describe(bet="the amount of coins to bet")
     @commands.cooldown(1, 10, commands.BucketType.user)
-    async def pure_catrace(ctx: commands.Context, bet: int):
-        if bet <= 0:
-            await ctx.reply("bet must be greater than zero")
-            return
+    async def pure_catrace(ctx: commands.Context, bet: str):
+        bet = _to_bet(bet)
 
         bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
         if bal < bet and ctx.bot.user.id != 1522117141090799697:
