@@ -6,6 +6,7 @@ from discord import app_commands
 import bot.db as db
 import os
 from bot.commands import is_admin, is_bot_dev
+from bot.commands.economy import _to_bet
 
 async def check_if_dev(user_id):
     AUTHORIZED_USERS = [
@@ -303,7 +304,8 @@ def setup_admin(client: commands.Bot):
     @is_admin()
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(user="the user whose balance to set", amount="the new balance amount")
-    async def ec_set(ctx: commands.Context, user: discord.Member, amount: int):
+    async def ec_set(ctx: commands.Context, user: discord.Member, amount: str):
+        amount = _to_bet(amount)
         if amount < 0:
             await ctx.reply("amount cannot be negative")
             return
@@ -315,7 +317,8 @@ def setup_admin(client: commands.Bot):
     @is_admin()
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(user="the user whose bank balance to set", amount="the new bank balance amount")
-    async def ec_setbank(ctx: commands.Context, user: discord.Member, amount: int):
+    async def ec_setbank(ctx: commands.Context, user: discord.Member, amount: str):
+        amount = _to_bet(amount)
         if amount < 0:
             await ctx.reply("amount cannot be negative")
             return
@@ -327,7 +330,8 @@ def setup_admin(client: commands.Bot):
     @is_admin()
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(user="the user to give coins to", amount="how many coins to add")
-    async def ec_add(ctx: commands.Context, user: discord.Member, amount: int):
+    async def ec_add(ctx: commands.Context, user: discord.Member, amount: str):
+        amount = _to_bet(amount)
         if amount <= 0:
             await ctx.reply("amount must be greater than zero")
             return

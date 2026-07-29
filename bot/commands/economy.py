@@ -902,7 +902,8 @@ def setup_economy(client: commands.Bot):
 
     @client.hybrid_command(name="deposit", description="deposit coins into your bank")
     @app_commands.describe(amount="amount to deposit")
-    async def deposit(ctx: commands.Context, amount: int):
+    async def deposit(ctx: commands.Context, amount: str):
+        amount = _to_bet(amount)
         if amount <= 0:
             await ctx.reply("amount must be greater than zero")
             return
@@ -919,7 +920,8 @@ def setup_economy(client: commands.Bot):
 
     @client.hybrid_command(name="withdraw", description="withdraw coins from your bank")
     @app_commands.describe(amount="amount to withdraw")
-    async def withdraw(ctx: commands.Context, amount: int):
+    async def withdraw(ctx: commands.Context, amount: str):
+        amount = _to_bet(amount)
         if amount <= 0:
             await ctx.reply("amount must be greater than zero")
             return
@@ -957,7 +959,8 @@ def setup_economy(client: commands.Bot):
     # Loan command
     @client.hybrid_command(name="loan", description="take out a loan. interest is 10%")
     @app_commands.describe(amount="how many coins to borrow")
-    async def loan(ctx: commands.Context, amount: int):
+    async def loan(ctx: commands.Context, amount: str):
+        amount = _to_bet(amount)
         if amount <= 0:
             await ctx.reply("amount must be greater than zero")
             return
@@ -978,7 +981,8 @@ def setup_economy(client: commands.Bot):
     # Repay command
     @client.hybrid_command(name="repay", description="repay your debt")
     @app_commands.describe(amount="how many coins to put toward your debt")
-    async def repay(ctx: commands.Context, amount: int):
+    async def repay(ctx: commands.Context, amount: str):
+        amount = _to_bet(amount)
         if amount <= 0:
             await ctx.reply("amount must be greater than zero")
             return
