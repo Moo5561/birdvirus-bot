@@ -26,13 +26,14 @@ def calculate_hand(hand):
     return value
 
 class BlackjackView(discord.ui.View):
-    def __init__(self, ctx, bet, player_hand, dealer_hand, coin_emoji):
+    def __init__(self, ctx, bet, player_hand, dealer_hand, coin_emoji, game_unlock=None):
         super().__init__(timeout=60.0)
         self.ctx = ctx
         self.bet = bet
         self.player_hand = player_hand
         self.dealer_hand = dealer_hand
         self.coin_emoji = coin_emoji
+        self._game_unlock = game_unlock
         self.message = None
 
     def get_embed(self, hide_dealer=True, status="game in progress"):
@@ -73,6 +74,8 @@ class BlackjackView(discord.ui.View):
         
         if player_score > 21:
             self.stop()
+            if self._game_unlock:
+                self._game_unlock(self.ctx)
             new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, -self.bet)
             
             for item in self.children:
@@ -86,6 +89,8 @@ class BlackjackView(discord.ui.View):
     @discord.ui.button(label="stand", style=discord.ButtonStyle.green)
     async def stand_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.stop()
+        if self._game_unlock:
+            self._game_unlock(self.ctx)
         
         while calculate_hand(self.dealer_hand) < 17:
             self.dealer_hand.append(draw_card())
@@ -112,6 +117,8 @@ class BlackjackView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=self)
 
     async def on_timeout(self):
+        if self._game_unlock:
+            self._game_unlock(self.ctx)
         for item in self.children:
             item.disabled = True
         

@@ -5,6 +5,15 @@ import bot.db as db
 
 audio_queues = {}
 voice_joiners = {}
+in_game = set()
+
+def game_lock(ctx):
+    if ctx.author.id in in_game:
+        raise commands.CommandError("you already have a game running")
+    in_game.add(ctx.author.id)
+
+def game_unlock(ctx):
+    in_game.discard(ctx.author.id)
 
 # Global DM fallback monkeypatch
 _original_send = commands.Context.send

@@ -134,6 +134,8 @@ def setup(client: commands.Bot):
             await ctx.reply(
                 f"slow down dude wait {error.retry_after:.1f} seconds", ephemeral=True
             )
+        elif isinstance(error, commands.CommandError):
+            await ctx.reply(str(error), ephemeral=True)
         else:
             print(f"command error: {error}")
             try:

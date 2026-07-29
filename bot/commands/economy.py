@@ -4,7 +4,7 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
-from bot.commands import is_admin
+from bot.commands import is_admin, game_lock, game_unlock
 from bot.commands.blackjack import BlackjackView, draw_card
 from bot.commands.horserace import HorseRaceView
 from bot.commands.catrace import CatRaceView
@@ -172,6 +172,7 @@ class BirdvirusGameView(discord.ui.View):
                 return
             
             self.stop()
+            game_unlock(self.ctx)
             for item in self.children:
                 item.disabled = True
             
@@ -203,6 +204,7 @@ class BirdvirusGameView(discord.ui.View):
         return callback
 
     async def on_timeout(self):
+        game_unlock(self.ctx)
         for item in self.children:
             item.disabled = True
         net_gain = -self.bet
@@ -223,6 +225,7 @@ def setup_economy(client: commands.Bot):
 
     @pure_chance_command := pure_group.command(name="chance", description="gamble your coins on pure chance")
     @app_commands.describe(bet="amount of coins to bet")
+    @commands.cooldown(1, 3, commands.BucketType.user)
     async def pure_chance(ctx: commands.Context, bet: int):
         if bet <= 0:
             await ctx.reply("bet must be greater than zero")
@@ -247,6 +250,7 @@ def setup_economy(client: commands.Bot):
 
     @pure_blackjack_command := pure_group.command(name="blackjack", description="play a game of blackjack against the dealer")
     @app_commands.describe(bet="the amount of coins to bet")
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def pure_blackjack(ctx: commands.Context, bet: int):
         if bet <= 0:
             await ctx.reply("bet must be greater than zero")
@@ -256,20 +260,21 @@ def setup_economy(client: commands.Bot):
         if balance_val < bet:
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {balance_val})")
             return
+
+        game_lock(ctx)
             
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         
         player_hand = [draw_card(), draw_card()]
         dealer_hand = [draw_card(), draw_card()]
         
-        player_total = player_hand[0][0] # Dummy logic, calculate_hand is better. But wait, we imported calculat_hand earlier? Let's check calculate_hand and draw_card.
-        # Wait, let's use calculate_hand! We should import calculate_hand from blackjack.py as well.
         from bot.commands.blackjack import calculate_hand
         
         player_total = calculate_hand(player_hand)
         dealer_total = calculate_hand(dealer_hand)
         
         if player_total == 21:
+            game_unlock(ctx)
             if dealer_total == 21:
                 await ctx.reply(f"both got natural blackjack! it's a tie. bet refunded")
             else:
@@ -279,11 +284,12 @@ def setup_economy(client: commands.Bot):
                 await ctx.reply(f"natural blackjack! you won {payout} {coin_emoji} (balance: {new_balance}) (tax: {tax} {coin_emoji})")
             return
 
-        view = BlackjackView(ctx, bet, player_hand, dealer_hand, coin_emoji)
+        view = BlackjackView(ctx, bet, player_hand, dealer_hand, coin_emoji, game_unlock)
         await view.start(ctx)
 
     @pure_slots_command := pure_group.command(name="slots", description="play slots and try to win big")
     @app_commands.describe(bet="the amount of coins to bet")
+    @commands.cooldown(1, 3, commands.BucketType.user)
     async def pure_slots(ctx: commands.Context, bet: int):
         if bet <= 0:
             await ctx.reply("bet must be greater than zero")
@@ -370,6 +376,7 @@ def setup_economy(client: commands.Bot):
         bet="the amount of coins to bet",
         guess="where to bet: red, black, even, odd, high (19-36), low (1-18), or a specific number (0-36)"
     )
+    @commands.cooldown(1, 3, commands.BucketType.user)
     async def pure_roulette(ctx: commands.Context, bet: int, guess: str):
         if bet <= 0:
             await ctx.reply("bet must be greater than zero")
@@ -484,6 +491,7 @@ def setup_economy(client: commands.Bot):
 
     @pure_insaneroll_command := pure_group.command(name="insaneroll", description="roll a d20 with insane stakes")
     @app_commands.describe(bet="the amount of coins to bet")
+    @commands.cooldown(1, 3, commands.BucketType.user)
     async def pure_insaneroll(ctx: commands.Context, bet: int):
         if bet <= 0:
             await ctx.reply("bet must be greater than zero")
@@ -558,6 +566,8 @@ def setup_economy(client: commands.Bot):
 
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
 
+        game_lock(ctx)
+
         high_risk_locs = ["a quarantined zone", "a biohazard waste dump", "a glowing green puddle", "an abandoned testing lab", "the sewer drains"]
         low_risk_locs = ["a clean park", "a fresh bird feeder", "someone's balcony", "a nice oak tree", "a local garden"]
         
@@ -593,6 +603,7 @@ def setup_economy(client: commands.Bot):
 
     @pure_plinko_command := pure_group.command(name="plinko", description="drop the ball down the plinko board")
     @app_commands.describe(bet="amount of coins to bet")
+    @commands.cooldown(1, 3, commands.BucketType.user)
     async def pure_plinko(ctx: commands.Context, bet: int):
         if bet <= 0:
             await ctx.reply("bet must be greater than zero")
@@ -670,6 +681,7 @@ def setup_economy(client: commands.Bot):
 
     @pure_plinkohard_command := pure_group.command(name="plinkohard", description="HARD MODE plinko - higher risk, higher reward")
     @app_commands.describe(bet="amount of coins to bet")
+    @commands.cooldown(1, 3, commands.BucketType.user)
     async def pure_plinkohard(ctx: commands.Context, bet: int):
         if bet <= 0:
             await ctx.reply("bet must be greater than zero")
@@ -748,6 +760,7 @@ def setup_economy(client: commands.Bot):
 
     @pure_horse_command := pure_group.command(name="horse", description="bet on a horse race at the birdvirus track")
     @app_commands.describe(bet="the amount of coins to bet")
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def pure_horse(ctx: commands.Context, bet: int):
         if bet <= 0:
             await ctx.reply("bet must be greater than zero")
@@ -758,12 +771,14 @@ def setup_economy(client: commands.Bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
 
+        game_lock(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        view = HorseRaceView(ctx, bet, coin_emoji)
+        view = HorseRaceView(ctx, bet, coin_emoji, game_unlock)
         await view.start(ctx)
 
     @pure_catrace_command := pure_group.command(name="catrace", description="bet on a cat race at the birdvirus track")
     @app_commands.describe(bet="the amount of coins to bet")
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def pure_catrace(ctx: commands.Context, bet: int):
         if bet <= 0:
             await ctx.reply("bet must be greater than zero")
@@ -774,8 +789,9 @@ def setup_economy(client: commands.Bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
 
+        game_lock(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        view = CatRaceView(ctx, bet, coin_emoji)
+        view = CatRaceView(ctx, bet, coin_emoji, game_unlock)
         await view.start(ctx)
 
     @client.hybrid_command(name="leaderboard", description="view the richest players")

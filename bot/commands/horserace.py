@@ -23,11 +23,12 @@ def render_progress_bar(position: int, track_length: int = TRACK_LENGTH) -> str:
 
 
 class HorseRaceView(discord.ui.View):
-    def __init__(self, ctx: commands.Context, bet: int, coin_emoji: str):
+    def __init__(self, ctx: commands.Context, bet: int, coin_emoji: str, game_unlock=None):
         super().__init__(timeout=60.0)
         self.ctx = ctx
         self.bet = bet
         self.coin_emoji = coin_emoji
+        self._game_unlock = game_unlock
         self.message: discord.Message | None = None
         self.selected_horse_idx: int | None = None
         self.horses = list(HORSES)
@@ -144,6 +145,8 @@ class HorseRaceView(discord.ui.View):
                 view=None
             )
             self.stop()
+            if self._game_unlock:
+                self._game_unlock(self.ctx)
             return
 
         # show starting line
@@ -203,6 +206,8 @@ class HorseRaceView(discord.ui.View):
         result_embed = self.get_result_embed(winner_idx, net_gain, new_balance, tied=tied)
         await self.message.edit(embed=result_embed)
         self.stop()
+        if self._game_unlock:
+            self._game_unlock(self.ctx)
 
     @discord.ui.button(label="cancel", style=discord.ButtonStyle.red)
     async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -211,8 +216,12 @@ class HorseRaceView(discord.ui.View):
             view=None
         )
         self.stop()
+        if self._game_unlock:
+            self._game_unlock(self.ctx)
 
     async def on_timeout(self):
+        if self._game_unlock:
+            self._game_unlock(self.ctx)
         if self.message:
             try:
                 await self.message.edit(
