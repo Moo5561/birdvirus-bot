@@ -603,21 +603,23 @@ def setup_utility(client: commands.Bot):
             import shutil
 
             client_g4f = AsyncClient()
-            os.makedirs("generated_media", exist_ok=True)
             response = await client_g4f.media.generate(
                 text, model="gpt-4o-mini-tts", audio={"voice": "coral"}
             )
 
-            os.makedirs("mp3", exist_ok=True)
-            filename = f"mp3/tts_{ctx.guild.id}_{ctx.author.id}.mp3"
+            if not response.data:
+                await ctx.reply("error: tts generation produced no audio")
+                return
 
-            # g4f returns a url like /media/file%2Bname.mp3 but saves it in ./generated_media/file+name.mp3
-            # their built-in .save() method is broken on windows because of the leading slash
+            os.makedirs("mp3", exist_ok=True)
+            guild_id = getattr(ctx.guild, "id", 0)
+            filename = f"mp3/tts_{guild_id}_{ctx.author.id}.mp3"
+
             item_url = response.data[0].url
             raw_filename = urllib.parse.unquote(os.path.basename(item_url))
             source_path = os.path.join("generated_media", raw_filename)
 
-            shutil.copy(source_path, filename)
+            shutil.move(source_path, filename)
 
             if ctx.voice_client is None:
                 await ctx.reply(file=discord.File(filename))
@@ -627,7 +629,10 @@ def setup_utility(client: commands.Bot):
                 queue_audio(ctx.voice_client, filename)
                 await ctx.reply(f"queued tts 🗣️")
         except Exception as e:
-            await ctx.reply(f"error generating tts: {e}")
+            error_msg = str(e)
+            if len(error_msg) > 1900:
+                error_msg = error_msg[:1900] + "..."
+            await ctx.reply(f"error generating tts: {error_msg}")
 
     NUMBAIRY_MAP = {
         "16437862583086278": " ",
