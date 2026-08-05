@@ -599,16 +599,32 @@ def setup_utility(client: commands.Bot):
         await ctx.reply(f"generating tts for: '{text}'...")
         try:
             from g4f.client import AsyncClient
+            from g4f.Provider import OpenAIFM, Gemini
             import urllib.parse
             import shutil
 
-            client_g4f = AsyncClient()
-            response = await client_g4f.media.generate(
-                text, model="gpt-4o-mini-tts", audio={"voice": "coral"}
-            )
+            tts_providers = [
+                (OpenAIFM, {"model": "gpt-4o-mini-tts", "audio": {"voice": "coral"}}),
+                (Gemini, {"model": "gemini-audio"}),
+            ]
 
-            if not response.data:
-                await ctx.reply("error: tts generation produced no audio")
+            response = None
+            last_error = None
+            for provider, kwargs in tts_providers:
+                try:
+                    client_g4f = AsyncClient(media_provider=provider)
+                    response = await client_g4f.media.generate(text, **kwargs)
+                    if response.data:
+                        break
+                except Exception as prov_err:
+                    last_error = prov_err
+                    continue
+
+            if response is None or not response.data:
+                error_msg = str(last_error) if last_error else "all tts providers failed"
+                if len(error_msg) > 1900:
+                    error_msg = error_msg[:1900] + "..."
+                await ctx.reply(f"error generating tts: {error_msg}")
                 return
 
             os.makedirs("mp3", exist_ok=True)
