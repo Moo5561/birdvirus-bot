@@ -68,7 +68,7 @@ def _write_banned_users_sync(ids: Set[int]):
 
 
 def _add_ban_sync(user_id: int):
-    ids = _read_banned_users_sync()
+    ids = set(_read_banned_users_sync())
     if user_id in ids:
         return
     ids.add(int(user_id))
@@ -81,7 +81,7 @@ async def add_ban(user_id: int):
 
 
 def _remove_ban_sync(user_id: int):
-    ids = _read_banned_users_sync()
+    ids = set(_read_banned_users_sync())
     if int(user_id) not in ids:
         return
     ids.discard(int(user_id))
