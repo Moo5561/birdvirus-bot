@@ -1,8 +1,21 @@
 import os
+import time
 import asyncio
 from typing import Set
 
 BAN_FILE = "bot/banned_users.txt"
+
+# in-memory cache so we're not reading the file off disk on every message,
+# command, and interaction. refreshed on a short ttl and invalidated on write.
+_CACHE_TTL = 5.0
+_cache = None
+_cache_ts = -1.0
+
+
+def _invalidate_cache():
+    global _cache, _cache_ts
+    _cache = None
+    _cache_ts = -1.0
 
 
 def _ensure_file():
@@ -15,6 +28,10 @@ def _ensure_file():
 
 
 def _read_banned_users_sync() -> Set[int]:
+    global _cache, _cache_ts
+    now = time.monotonic()
+    if _cache is not None and (now - _cache_ts) < _CACHE_TTL:
+        return _cache
     _ensure_file()
     ids = set()
     try:
@@ -30,6 +47,8 @@ def _read_banned_users_sync() -> Set[int]:
                     continue
     except FileNotFoundError:
         pass
+    _cache = ids
+    _cache_ts = now
     return ids
 
 
@@ -54,6 +73,7 @@ def _add_ban_sync(user_id: int):
         return
     ids.add(int(user_id))
     _write_banned_users_sync(ids)
+    _invalidate_cache()
 
 
 async def add_ban(user_id: int):
@@ -66,6 +86,7 @@ def _remove_ban_sync(user_id: int):
         return
     ids.discard(int(user_id))
     _write_banned_users_sync(ids)
+    _invalidate_cache()
 
 
 async def remove_ban(user_id: int):
