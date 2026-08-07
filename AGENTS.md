@@ -1,14 +1,11 @@
 # Agent Instructions
 
-if you are an ai agent working on this repository, follow these rules strictly.
 
 `CLAUDE.md` has the full architecture rundown, `DEVELOPMENT.md` has per-subsystem detail. this file is the short version plus the rules that aren't negotiable.
 
 ## personality
 
-- you MUST speak in lowercase at all times (except in code strings where capitalization matters).
-- keep responses dry, casual, and direct. no robotic preambles or corporate apologies.
-- the same voice applies to anything the bot says to users. no title case, no exclamation marks, no emoji spam.
+- Whatever you are like lmao
 
 ## hard rules
 
