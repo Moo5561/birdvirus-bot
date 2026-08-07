@@ -853,7 +853,7 @@ def setup_economy(client: commands.Bot):
         house = await asyncio.to_thread(db.get_house)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         tax_collected = await asyncio.to_thread(db.get_config, "tax_collected", "0")
-        rake_pct = await asyncio.to_thread(db.get_config, "house_rake", "5")
+        rake_pct = await asyncio.to_thread(db.get_config, "house_rake", "25")
         status = "📈 the house is up" if house >= 0 else "📉 the house is in the hole"
         devs = await asyncio.to_thread(db.get_config, "house_devs", "the devs")
         await ctx.reply(f"🏦 **house wallet:** {_s(house)} {coin_emoji} ({status})\n"
@@ -885,6 +885,26 @@ def setup_economy(client: commands.Bot):
         await asyncio.to_thread(db.update_house, -claim)
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, claim)
         await ctx.reply(f"🏦 claimed {claim} {coin_emoji} from the house. your balance: {new_balance} {coin_emoji}")
+
+    @pure_bailout_command := pure_group.command(name="bailout", description="dev-only: inject or reset the house wallet")
+    @is_dev()
+    async def pure_bailout(ctx: commands.Context, amount: str = None):
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        house = await asyncio.to_thread(db.get_house)
+        if amount and amount.lower() == "wipe":
+            await asyncio.to_thread(db.set_config, "house_wallet", "0")
+            await ctx.reply(f"🧹 house wallet wiped to 0 {coin_emoji}. fresh start")
+            return
+        if amount:
+            try:
+                injection = int(amount)
+            except ValueError:
+                await ctx.reply("amount must be a number or 'wipe'")
+                return
+            new_house = await asyncio.to_thread(db.update_house, injection)
+            await ctx.reply(f"💉 injected {injection} {coin_emoji} into the house. new balance: {new_house} {coin_emoji}")
+        else:
+            await ctx.reply(f"house: {house} {coin_emoji}\nusage: `/pure bailout <amount>` to inject, `/pure bailout wipe` to zero it")
 
     @client.hybrid_command(name="leaderboard", description="view the richest players")
     @app_commands.describe(page="page number to view")

@@ -150,7 +150,7 @@ async def track_gamble(ctx, net_gain):
     if is_nightly(ctx.bot):
         return
     if net_gain > 0:
-        rake_pct = int(await asyncio.to_thread(db.get_config, "house_rake", "5") or "5")
+        rake_pct = int(await asyncio.to_thread(db.get_config, "house_rake", "25") or "25")
         if rake_pct > 0:
             rake = max(1, int(net_gain * rake_pct / 100))
             await asyncio.to_thread(db.update_balance, ctx.author.id, -rake)
