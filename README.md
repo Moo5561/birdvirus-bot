@@ -1,6 +1,6 @@
 # birdvirus-bot
 
-<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Pepsi_logo_2014.svg/1200px-Pepsi_logo_2014.svg.png" width="120" align="right">
+<img src="pepsi.svg" width="120" align="right">
 
 the official discord bot for the birdvirus community. multipurpose economy, audio, and ai chat bot built with discord.py.
 
