@@ -1,3 +1,4 @@
+import io
 import random
 import asyncio
 import discord
@@ -5,6 +6,7 @@ import discord.ext.commands as commands
 from discord import app_commands
 from discord.ext import tasks
 from datetime import datetime, timezone
+import matplotlib.pyplot as plt
 import bot.db as db
 from bot.commands import is_admin, is_nightly, game_lock, game_unlock, _s
 
@@ -12,11 +14,11 @@ from bot.commands import is_admin, is_nightly, game_lock, game_unlock, _s
 # every ticker drifts around on a seeded random walk, persisted in stock_state.
 
 STOCKS = [
-    {"ticker": "BIRD", "name": "BirdTech Inc", "emoji": "🐦", "base": 10000, "vol": 0.08},
-    {"ticker": "VAC", "name": "VaxCorp Labs", "emoji": "💉", "base": 20000, "vol": 0.12},
-    {"ticker": "DROID", "name": "DroidSound Co", "emoji": "🤖", "base": 15000, "vol": 0.15},
-    {"ticker": "PECK", "name": "PeckCoin Mining", "emoji": "⛏️", "base": 5000, "vol": 0.20},
-    {"ticker": "FEED", "name": "Seed & Feed", "emoji": "🌻", "base": 8000, "vol": 0.06},
+    {"ticker": "BIRD", "name": "BirdTech Inc", "emoji": "🐦", "base": 10000, "vol": 0.08, "color": "#00e5ff"},
+    {"ticker": "VAC", "name": "VaxCorp Labs", "emoji": "💉", "base": 20000, "vol": 0.12, "color": "#00ff88"},
+    {"ticker": "DROID", "name": "DroidSound Co", "emoji": "🤖", "base": 15000, "vol": 0.15, "color": "#ffaa00"},
+    {"ticker": "PECK", "name": "PeckCoin Mining", "emoji": "⛏️", "base": 5000, "vol": 0.20, "color": "#ff4444"},
+    {"ticker": "FEED", "name": "Seed & Feed", "emoji": "🌻", "base": 8000, "vol": 0.06, "color": "#aa66ff"},
 ]
 
 HIST_LEN = 12
@@ -34,6 +36,49 @@ def sparkline(hist):
         return "▬" * min(len(hist), 12)
     bars = "▁▂▃▄▅▆▇█"
     return "".join(bars[min(7, int((p - lo) / (hi - lo) * 8))] for p in hist)
+
+
+def build_market_chart(all_hist):
+    """render an overlay line chart of all tickers to a BytesIO png."""
+    fig, ax = plt.subplots(figsize=(12, 7), facecolor="#1a1a1a")
+    ax.set_facecolor("#1a1a1a")
+
+    for ticker, hist in all_hist.items():
+        if not hist:
+            continue
+        stock = next((s for s in STOCKS if s["ticker"] == ticker), None)
+        color = stock["color"] if stock and "color" in stock else None
+        # normalize to % change from start so big/small tickers share a scale
+        if hist[0]:
+            pct = [(p / hist[0] - 1) * 100 for p in hist]
+        else:
+            pct = []
+        ax.plot(range(len(pct)), pct, marker="o", markersize=3,
+                label=f"{ticker}", color=color, linewidth=2)
+
+    ax.axhline(0, color="#555555", linewidth=1, linestyle="--")
+    ax.set_title("📈 birdvirus stock exchange — % change", color="white",
+                 fontsize=15, fontweight="bold", pad=16)
+    ax.set_ylabel("% since start", color="white", fontsize=11, fontweight="bold")
+    ax.tick_params(axis="x", colors="white", labelsize=9)
+    ax.tick_params(axis="y", colors="white", labelsize=9)
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
+    for spine in ("bottom", "left"):
+        ax.spines[spine].set_color("white")
+    ax.grid(axis="y", alpha=0.2, color="white", linestyle="--")
+
+    ax.legend(facecolor="#1a1a1a", labelcolor="white", fontsize=10,
+              ncol=len(all_hist) or 1, loc="lower left")
+    for leg in ax.get_legend().get_texts():
+        leg.set_text(leg.get_text().upper())
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", facecolor="#1a1a1a")
+    buf.seek(0)
+    plt.close(fig)
+    return buf
 
 
 def ensure_stock(ticker):
@@ -88,17 +133,19 @@ def setup_stocks(client: commands.Bot):
 
     @stock_group.command(name="market", description="view live stock prices")
     async def stock_market(ctx: commands.Context):
+        await ctx.defer()
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         embed = discord.Embed(
             title="📈 Birdvirus Stock Exchange",
-            description="prices drift in real time. buy low, sell high, lose everything.",
             color=0x2f3136,
         )
 
         lines = []
+        all_hist = {}
         for s in STOCKS:
             price = await asyncio.to_thread(db.get_stock_price, s["ticker"])
             hist = await asyncio.to_thread(db.get_stock_history, s["ticker"])
+            all_hist[s["ticker"]] = hist
             change = ""
             if len(hist) >= 2:
                 diff = price - hist[0]
@@ -110,8 +157,13 @@ def setup_stocks(client: commands.Bot):
                 f"┗ `{sparkline(hist)}`"
             )
         embed.description = "\n\n".join(lines)
-        embed.set_footer(text="buy/sell with /stock buy <ticker> <shares>")
-        await ctx.reply(embed=embed)
+
+        embed.set_image(url="attachment://stocks_chart.png")
+        embed.set_footer(text="live % change chart below • /stock buy <ticker> <shares>")
+
+        chart_buf = await asyncio.to_thread(build_market_chart, all_hist)
+        file = discord.File(chart_buf, filename="stocks_chart.png")
+        await ctx.reply(embed=embed, file=file)
 
     @stock_group.command(name="buy", description="buy shares of a stock")
     @app_commands.describe(ticker="which stock to buy (BIRD, VAC, DROID, PECK, FEED)", shares="how many shares")
