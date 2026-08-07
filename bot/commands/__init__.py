@@ -114,11 +114,15 @@ def is_bot_dev():
 
 
 def _s(num):
-    """abbreviate a number: 1234 -> 1.2k, 5678900 -> 5.7m, -20q -> -20q"""
+    """abbreviate a number: 1234 -> 1.2k, 5678900 -> 5.7m"""
     sign = "-" if num < 0 else ""
     n = abs(num)
-    if n >= 1_000_000_000_000_000:
-        s = f"{n:.15e}"
+    if n >= 1_000_000_000_000_000_000:  # very big, just show raw
+        s = str(n)
+    elif n >= 1_000_000_000_000_000:
+        s = f"{n // 1_000_000_000_000_000}q"
+    elif n >= 1_000_000_000_000:
+        s = f"{n // 1_000_000_000_000}t"
     elif n >= 1_000_000_000:
         s = f"{n / 1_000_000_000:.1f}b"
     elif n >= 1_000_000:
@@ -127,10 +131,9 @@ def _s(num):
         s = f"{n / 1_000:.1f}k"
     else:
         s = str(n)
-    if s.endswith(".0") and s[-3].isdigit():
+    if s.endswith(".0") and len(s) > 2 and s[-3].isdigit():
         s = s[:-2]
     return sign + s
-
 
 async def claim_streak_bonus(ctx):
     """grant the once-daily gambling streak bonus. returns bonus amount."""
