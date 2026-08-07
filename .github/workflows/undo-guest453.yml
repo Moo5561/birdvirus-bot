@@ -1,0 +1,33 @@
+name: undo guest453
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  revert:
+    runs-on: ubuntu-latest
+    if: github.actor == 'Guest453'
+    steps:
+      - name: checkout with history
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: revert the push back to its baseline
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -e
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "${{ github.event.after }}" ]; then
+            echo "nothing to undo"
+            exit 0
+          fi
+          git reset --hard "$BEFORE"
+          git push --force origin "HEAD:refs/heads/main"
