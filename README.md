@@ -8,7 +8,7 @@ the official discord bot for the birdvirus community. multipurpose economy, audi
 - **voice & audio** — queue system for local files and youtube (via yt-dlp). random birdvirus/bird sounds play automatically in vc. g4f text-to-speech support.
 - **job system** — 6 jobs (janitor, chef, developer, hacker, miner, thief) each with a unique minigame, levels, xp, promotions, and random events.
 - **properties** — buy private threads or voice channels with custom roles, invite/kick system.
-- **ai chat** — `/chat` talks to you with context memory, optional web search via playwright screenshots.
+- **ai chat** — `/chat` AI talks to you with context memory.
 - **admin** — ban/unban users, view logs, manage economy, configure coin emoji.
 
 ## setup
