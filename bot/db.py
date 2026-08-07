@@ -12,6 +12,17 @@ def _safe_int(val, default=0):
     except (ValueError, OverflowError):
         return default
 
+
+def _is_corrupt(val):
+    """true if a balance/bank/debt value is mangled beyond parsing."""
+    if val is None:
+        return False
+    try:
+        int(val)
+        return False
+    except (ValueError, OverflowError):
+        return True
+
 # thread-local persistent connections. each executor thread reuses one
 # connection instead of opening/closing per call — huge win under load.
 # WAL lets readers run concurrently with the single writer.
@@ -258,6 +269,13 @@ def get_balances(user_id: int) -> tuple[int, int, int]:
     else:
         balance, bank = _safe_int(row[0]), _safe_int(row[1])
         debt = _safe_int(row[2])
+        if _is_corrupt(row[0]) or _is_corrupt(row[1]) or _is_corrupt(row[2]):
+            cursor.execute(
+                "UPDATE economy SET balance = '0', bank = '0', debt = '0' WHERE user_id = ?",
+                (user_id,),
+            )
+            conn.commit()
+            balance, bank, debt = 0, 0, 0
     cursor.close()
     return balance, bank, debt
 
@@ -274,7 +292,12 @@ def get_balance(user_id: int) -> int:
         conn.commit()
         balance = 100
     else:
-        balance = _safe_int(row[0])
+        if _is_corrupt(row[0]):
+            cursor.execute("UPDATE economy SET balance = '0' WHERE user_id = ?", (user_id,))
+            conn.commit()
+            balance = 0
+        else:
+            balance = _safe_int(row[0])
     cursor.close()
     return balance
 
