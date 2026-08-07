@@ -213,7 +213,9 @@ def setup_stocks(client: commands.Bot):
         all_hist = {}
         for s in STOCKS:
             price = await asyncio.to_thread(db.get_stock_price, s["ticker"])
-            hist = await asyncio.to_thread(db.get_stock_history, s["ticker"])
+            if price is None:
+                price = s["base"]
+            hist = await asyncio.to_thread(db.get_stock_history, s["ticker"]) or []
             all_hist[s["ticker"]] = hist
             change = ""
             if len(hist) >= 2:
@@ -295,6 +297,8 @@ def setup_stocks(client: commands.Bot):
 
         shares = min(shares, held)
         price = await asyncio.to_thread(db.get_stock_price, ticker)
+        if price is None:
+            price = stock["base"]
         proceeds = price * shares
 
         game_lock(ctx)
