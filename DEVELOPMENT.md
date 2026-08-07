@@ -1,105 +1,100 @@
 # development
 
-## architecture
+Per-subsystem detail. `AGENTS.md` has the rules, `CLAUDE.md` has the architecture and the traps — this file is what each subsystem actually does.
+
+## layout
 
 ```
 birdvirus-bot/
-├── main.py                  # entry point, bot setup, prefix logic
+├── main.py                     # entry point, prefix logic, bot-to-bot invocation override
 ├── bot/
-│   ├── config.py            # loads KEY and API_KEY from .env
-│   ├── db.py                # sqlite3 — economy, jobs, properties, config, bans, chat resets
-│   ├── bans.py              # async file-based ban list (banned_users.txt)
-│   ├── events.py            # on_ready, global ban check, "67" trigger, error handler
+│   ├── config.py               # .env loading, OWNER_IDS, NIGHTLY_BOT_ID
+│   ├── db.py                   # synchronous sqlite3 — every table below
+│   ├── bans.py                 # file-based ban list (banned_users.txt)
+│   ├── events.py               # on_ready, ban checks, "67" trigger, error handler
 │   └── commands/
-│       ├── __init__.py      # monkeypatches send/reply for dm fallback, is_admin/is_bot_dev checks, setup()
-│       ├── utility.py       # ping, gif, version, chat (ai), chat_reset, say, eatbomb, tts, internet search
-│       ├── economy.py       # pure group (chance, blackjack, slots, roulette, insaneroll, birdvirus, plinko, horse), beg, fish, deposit, withdraw, balance
-│       ├── voice.py         # vc group (join, leave, stop, bird, droid), bad apple, play, voice announcer task
-│       ├── admin.py         # ban, unban, view group (say, logs), clear group, property group, ec group
-│       ├── blackjack.py     # BlackjackView, draw_card, calculate_hand
-│       ├── horserace.py     # HorseRaceView with select horse and animated race
-│       └── job.py           # job group (list, info, apply, work, quit, beg) + 6 minigame views
-├── mp3/                     # audio files (birdvirus.mp3, bird.mp3, badapple.mp3, droid.mp3, etc.)
-├── templates/               # html templates (notable: birdvirus-cloud/)
-├── index.html               # redirects to birdvirus-cloud/
-├── version.txt              # current branch and commit
-├── .env.example             # key template
-├── requirements.txt         # dependencies
-└── setup.sh                 # venv + dependency installer
+│       ├── __init__.py         # shared state, send/reply monkeypatch, permission checks, _s(), setup()
+│       ├── economy.py          # pure group, banking, loans/debt, house, leaderboard
+│       ├── utility.py          # ping, gif, version, vote, chat, tts, say, eatbomb, numbairy, internet
+│       ├── voice.py            # vc group, play/stop, bad apple, queue_audio(), voice_announcer task
+│       ├── admin.py            # ban/unban, view, clear, property, ec groups
+│       ├── job.py              # job group + 6 minigame views
+│       ├── shop.py             # shop/buy/inv/use + item effects, ACTIVE_CHEATS
+│       ├── stocks.py           # stock group, market loop, matplotlib chart
+│       ├── update.py           # /update, syntax_check()
+│       ├── blackjack.py        # BlackjackView, draw_card, calculate_hand
+│       ├── horserace.py        # HorseRaceView
+│       └── catrace.py          # CatRaceView
+├── mp3/                        # audio files
+├── birdvirus-cloud/            # separate node/express service, not imported by the bot
+├── birdvirus.db                # tracked in git, see CLAUDE.md
+├── version.txt                 # written by CI, don't hand-edit
+└── setup.sh
 ```
 
-## conventions
+## database tables
 
-- all database calls from commands must be wrapped in `await asyncio.to_thread(...)` — `db.py` is synchronous sqlite3.
-- `ctx.send` and `ctx.reply` are monkeypatched in `bot/commands/__init__.py` to fallback to dms on `discord.Forbidden`.
-- admin commands use `@is_admin()` (checks a hardcoded list + db config + guild admin perms).
-- dev-only commands use `@is_bot_dev()` (same hardcoded list + db config, no guild perm fallback).
-- messaging is casual, all lowercase, no punctuation unless it's code.
+`init_db()` creates twelve: `economy`, `config`, `properties`, `say_logs`, `chat_resets`, `user_jobs`, `user_items`, `banned_users`, `gamble_streaks`, `gamble_daily`, `stock_state`, `stock_holdings`.
 
-## adding a new command
+## economy
 
-1. add the function in the appropriate file under `bot/commands/`.
-2. call the setup function from `bot/commands/__init__.py`.
-3. if it reads/writes to the db, wrap the call in `await asyncio.to_thread(...)`.
-4. since `default_allowed_contexts` is set globally in `main.py`, new commands automatically work in dms and group chats.
+- users start with 100 coins holding, 0 bank. `/deposit` and `/withdraw` move between the two.
+- the house wallet is a single running integer in `config`, adjusted by `update_house()`. There is no history table, so there is no way to reconstruct what it was at a given time.
+- a house rake is taken from winning bets; tax and streak bonuses adjust it further. Every game settles in its own place — see the note in `CLAUDE.md:conventions`.
+- `/loan` takes debt at 10% interest, `/repay` pays it down, `/debt` reports it. Admins have `/ec debtforgive` and `/ec debtlist`.
+- `/ec taxrate` and `/ec taxinfo` control the tax; `/pure insurance`, `/pure house`, `/pure houseclaim`, and `/pure bailout` are the house-side commands.
+- the nightly bot bypasses balance checks entirely and has effectively infinite coins.
 
-## economy system
+## jobs
 
-- users start with 100 coins in their holding balance and 0 in bank.
-- the bank earns interest (configured via db, not yet exposed as a command).
-- coin emoji is configurable via `/ec emoji` (stored in config table as `coin_emoji`).
-- nightly dev bot (id `1522117141090799697`) bypasses all balance checks and has infinite coins.
+Defined in the `JOBS` dict in `bot/commands/job.py`:
 
-## audio system
+| job | minigame |
+|-----|----------|
+| janitor | click the poop button (9 tiles) |
+| chef | select ingredients in recipe order |
+| developer | pick the syntactically correct snippet |
+| hacker | crack a 3-digit pin, mastermind-style |
+| miner | 5×5 grid, find diamond, avoid lava |
+| thief | push your luck through 4 escalating stages |
 
-- `bot/commands/voice.py` manages a per-guild queue (`audio_queues` dict) and tracks who joined (`voice_joiners` dict).
-- `queue_audio()` handles both local mp3 paths and remote urls/yt-dlp streams.
-- two volume tiers: 0.60 for normal, 1.0 for files named "badapple_max".
-- a background task `voice_announcer` randomly plays bird sounds in all connected vcs every 15 seconds (80% chance).
+Each job has base pay scaling with level, a cooldown in minutes, a required overall level to apply, random events at 15% per shift, and a speed bonus measured against a par time. XP per level is `level * 100`.
 
-## job system
+## shop
 
-jobs are defined in `JOBS` dict in `bot/commands/job.py`:
-- `janitor` — click the poop button (9 tiles)
-- `chef` — select ingredients in order (recipe memory minigame)
-- `developer` — pick the syntactically correct code snippet
-- `hacker` — crack a 3-digit pin with feedback (mastermind-style)
-- `miner` — 5x5 grid, find diamond, avoid lava
-- `thief` — push your luck stealing through 4 stages with escalating risk/reward
+Time-gated on UTC. Normal stock is available `06:00`–`00:00` (`SHOP_OPEN`/`SHOP_CLOSE`); the illegal vendor only appears `18:00`–`20:00` (`ILLEGAL_START`/`ILLEGAL_END`). `/setshop` forces open/closed or reverts to time-based, `/setillegal` moves the illegal window.
 
-each job has:
-- base pay (scales with level)
-- cooldown (minutes)
-- requirement level (must be level N overall to apply)
-- random events (15% chance per shift)
-- speed bonuses (completion time multiplied against par time, penalizes slow completions)
+Items come from `NORMAL_ITEMS` and `ILLEGAL_ITEMS`, merged into `ALL_ITEMS` by name. `ITEM_EFFECTS` maps an item to the cheat it activates. Active cheats live in the in-memory `ACTIVE_CHEATS` dict — **consume them with `take_cheat(user_id, type)`**, since a bare `ACTIVE_CHEATS.pop()` discards whatever unrelated item the user had running. Because the dict is in memory, active cheats do not survive a restart.
 
-xp needed per level = `level * 100`
+## stocks
 
-## property system
+Ten tickers in the `STOCKS` list, each with a base price and a volatility factor. `market_loop` is a `tasks.loop(seconds=12.0)` started from an `on_ready` listener, which seeds any missing ticker via `ensure_stock()` first.
 
-- `/property register <channel>` — sets the channel where property threads are created.
-- `/property buy` — creates a private thread (50 coins) or a private vc with custom role (100 coins).
-- properties are tracked in the `properties` table in birdvirus.db.
+Most tickers drift synthetically through `drift_ticker()`. `RBLX` is flagged `"real": True` and instead pulls the live Roblox price from the Yahoo Finance chart API over `aiohttp`, throttled to one fetch per `REAL_FETCH_COOLDOWN` (45s) regardless of the 12s loop.
 
-## bot ids
+`HIST_LEN` (12) points of history are kept per ticker, which is what `/stock market` renders as a matplotlib per-ticker subplot chart and as inline sparklines.
 
-defined in `AGENTS.md`:
-- main bot: `1518310857598308433`
-- nightly/dev: `1522117141090799697` — uses `ht!` prefix, bypasses economy checks
+## audio
 
-## ban system
+- `queue_audio()` in `bot/commands/voice.py` accepts both local `mp3/` paths and remote URLs via yt-dlp.
+- volume is `PCMVolumeTransformer` at 0.60, except files named `badapple_max` at 1.0.
+- `voice_announcer` is a background task that plays a random bird sound in every connected vc every 15 seconds, at 80% chance.
+- `/vc join`/`/vc leave` also exist as bare prefix-only `join`/`leave` commands.
 
-two ban layers:
-1. file-based: `bot/banned_users.txt` (read async via `bans.py`)
-2. db-based: `banned_users` table in birdvirus.db
+## properties
 
-both are checked in `events.py` — global check for prefix commands, tree check for slash commands, and on_message listener.
+- `/property register <channel>` sets where property threads get created.
+- `/property buy` creates either a private thread (50 coins) or a private vc with a custom role (100 coins).
+- `/property invite` and `/property kick` manage vc property access; `/property remove` is admin-only.
+- tracked in the `properties` table.
+
+## bans
+
+Two layers, both checked: `bot/banned_users.txt` (read through `bans.py`) and the `banned_users` table as fallback. Enforced in three places — see `CLAUDE.md:messaging`.
 
 ## error handling
 
-- `UserBanned` exception (`bot/events.py`) is silently ignored.
-- `CheckFailure` / `MissingPermissions` responds with "you don't have permission to do that".
-- `CommandOnCooldown` responds with the remaining cooldown time.
-- all other errors are printed to console, not exposed to users (except api errors in chat).
-- the monkeypatched `send`/`reply` in `__init__.py` silently catches `discord.Forbidden` and falls back to dms.
+- `UserBanned` (`bot/events.py`) is silently swallowed.
+- `CheckFailure` / `MissingPermissions` → "you don't have permission to do that".
+- `CommandOnCooldown` → the remaining cooldown.
+- everything else is printed to console and not surfaced to users, except API errors in `/chat`.
