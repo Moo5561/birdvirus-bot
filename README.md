@@ -1,6 +1,6 @@
 # birdvirus-bot
 
-<img src="pepsi.svg" width="120" align="right">
+<img src="birdvirusbot.png" width="120" align="right">
 
 the official discord bot for the birdvirus community. multipurpose economy, audio, and ai chat bot built with discord.py.
 
