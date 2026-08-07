@@ -5,6 +5,13 @@ from datetime import datetime, timedelta
 
 DB_PATH = os.environ.get("BOT_DB_PATH", "birdvirus.db")
 
+
+def _safe_int(val, default=0):
+    try:
+        return int(val)
+    except (ValueError, OverflowError):
+        return default
+
 # thread-local persistent connections. each executor thread reuses one
 # connection instead of opening/closing per call — huge win under load.
 # WAL lets readers run concurrently with the single writer.
@@ -249,8 +256,8 @@ def get_balances(user_id: int) -> tuple[int, int, int]:
         conn.commit()
         balance, bank, debt = 100, 0, 0
     else:
-        balance, bank = int(row[0]), int(row[1])
-        debt = int(row[2] or 0)
+        balance, bank = _safe_int(row[0]), _safe_int(row[1])
+        debt = _safe_int(row[2])
     cursor.close()
     return balance, bank, debt
 
@@ -267,7 +274,7 @@ def get_balance(user_id: int) -> int:
         conn.commit()
         balance = 100
     else:
-        balance = int(row[0])
+        balance = _safe_int(row[0])
     cursor.close()
     return balance
 
@@ -306,7 +313,7 @@ def update_balance(user_id: int, change: int) -> int:
             (user_id, str(new_balance)),
         )
     else:
-        new_balance = int(row[0]) + change
+        new_balance = _safe_int(row[0]) + change
         cursor.execute(
             "UPDATE economy SET balance = ? WHERE user_id = ?", (str(new_balance), user_id)
         )
@@ -327,7 +334,7 @@ def update_bank(user_id: int, change: int) -> int:
             (user_id, str(new_bank)),
         )
     else:
-        new_bank = int(row[0] or 0) + change
+        new_bank = _safe_int(row[0]) + change
         cursor.execute(
             "UPDATE economy SET bank = ? WHERE user_id = ?", (str(new_bank), user_id)
         )
@@ -345,7 +352,7 @@ def get_debt(user_id: int) -> int:
         conn.commit()
         cursor.close()
         return 0
-    debt = int(row[0] or 0)
+    debt = _safe_int(row[0])
     cursor.close()
     return debt
 
@@ -368,7 +375,7 @@ def update_debt(user_id: int, change: int) -> int:
         new_debt = max(0, change)
         cursor.execute("INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', ?)", (user_id, str(new_debt)))
     else:
-        new_debt = int(row[0] or 0) + change
+        new_debt = _safe_int(row[0]) + change
         if new_debt < 0:
             new_debt = 0
         cursor.execute("UPDATE economy SET debt = ? WHERE user_id = ?", (str(new_debt), user_id))
@@ -382,7 +389,7 @@ def get_all_balances() -> list[dict]:
     cursor.execute("SELECT user_id, balance, bank, debt FROM economy ORDER BY (CAST(balance AS INTEGER) + CAST(bank AS INTEGER) - CAST(debt AS INTEGER)) DESC")
     rows = cursor.fetchall()
     cursor.close()
-    return [{"user_id": row[0], "balance": int(row[1]), "bank": int(row[2]), "debt": int(row[3] or 0)} for row in rows]
+    return [{"user_id": row[0], "balance": _safe_int(row[1]), "bank": _safe_int(row[2]), "debt": _safe_int(row[3])} for row in rows]
 
 def get_all_debts() -> list[dict]:
     conn = _conn()
@@ -390,7 +397,7 @@ def get_all_debts() -> list[dict]:
     cursor.execute("SELECT user_id, debt, balance, bank FROM economy WHERE CAST(debt AS INTEGER) > 0 ORDER BY CAST(debt AS INTEGER) DESC")
     rows = cursor.fetchall()
     cursor.close()
-    return [{"user_id": row[0], "debt": int(row[1]), "balance": int(row[2]), "bank": int(row[3])} for row in rows]
+    return [{"user_id": row[0], "debt": _safe_int(row[1]), "balance": _safe_int(row[2]), "bank": _safe_int(row[3])} for row in rows]
 
 
 # Config Functions (Emoji, Properties channel, etc)
@@ -421,7 +428,7 @@ def get_house() -> int:
     cursor.execute("SELECT CAST(value AS INTEGER) FROM config WHERE key = 'house_wallet'")
     row = cursor.fetchone()
     cursor.close()
-    return int(row[0]) if row and row[0] else 0
+    return _safe_int(row[0]) if row and row[0] else 0
 
 
 def execute(query: str, params: tuple = ()):
@@ -446,7 +453,7 @@ def update_house(change: int) -> int:
     conn.commit()
     cursor.execute("SELECT CAST(value AS INTEGER) FROM config WHERE key = 'house_wallet'")
     row = cursor.fetchone()
-    new_val = int(row[0]) if row and row[0] else 0
+    new_val = _safe_int(row[0]) if row and row[0] else 0
     cursor.close()
     return new_val
 
@@ -493,7 +500,7 @@ def get_locked_balances() -> list[int]:
     conn.commit()
     cursor.execute("SELECT CAST(value AS INTEGER) FROM config WHERE key = 'house_wallet'")
     row = cursor.fetchone()
-    new_val = int(row[0]) if row and row[0] else 0
+    new_val = _safe_int(row[0]) if row and row[0] else 0
     cursor.close()
     return new_val
 

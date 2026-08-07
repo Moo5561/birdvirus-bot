@@ -657,7 +657,7 @@ def setup_economy(client: commands.Bot):
         await claim_streak_bonus(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
 
-        multipliers = [15, 5, 2, 1, 2, 5, 15]
+        multipliers = [10, 3, 1.5, 0.5, 1.5, 3, 10]
         slot_labels = ['💀', '🔴', '🟠', '🟡', '🟠', '🔴', '💀']
 
         pos = 3
@@ -691,7 +691,7 @@ def setup_economy(client: commands.Bot):
         await asyncio.sleep(0.5)
 
         slots_row = ' '.join(slot_labels)
-        mults_row = '15x 5x 2x 1x 2x 5x 15x'
+        mults_row = '10x 3x 1.5 .5 1.5 3x 10x'
 
         net_gain = _payout(bet, multiplier) - bet
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
@@ -735,7 +735,7 @@ def setup_economy(client: commands.Bot):
         await claim_streak_bonus(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
 
-        multipliers = [50, 15, 3, 0.3, 0.3, 3, 15, 50]
+        multipliers = [25, 8, 2, 0.2, 0.2, 2, 8, 25]
         slot_labels = ['💀', '🔴', '🟠', '🟡', '🟡', '🟠', '🔴', '💀']
 
         pos = 3
@@ -770,7 +770,7 @@ def setup_economy(client: commands.Bot):
         await asyncio.sleep(0.5)
 
         slots_row = ' '.join(slot_labels)
-        mults_row = '50x 15x 3x .3 .3 3x 15x 50x'
+        mults_row = '25x 8x 2x .2 .2 2x 8x 25x'
 
         net_gain = _payout(bet, multiplier) - bet
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
