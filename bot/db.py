@@ -414,6 +414,33 @@ def set_config(key: str, value: str):
     cursor.close()
 
 
+# House Wallet
+def get_house() -> int:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT CAST(value AS INTEGER) FROM config WHERE key = 'house_wallet'")
+    row = cursor.fetchone()
+    cursor.close()
+    return int(row[0]) if row and row[0] else 0
+
+
+def update_house(change: int) -> int:
+    """atomically adjust the house wallet balance. returns new balance."""
+    conn = _conn()
+    cursor = conn.cursor()
+    val = str(change)
+    cursor.execute(
+        "INSERT INTO config (key, value) VALUES ('house_wallet', ?) ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + CAST(? AS INTEGER)",
+        (val, val),
+    )
+    conn.commit()
+    cursor.execute("SELECT CAST(value AS INTEGER) FROM config WHERE key = 'house_wallet'")
+    row = cursor.fetchone()
+    new_val = int(row[0]) if row and row[0] else 0
+    cursor.close()
+    return new_val
+
+
 # Properties Functions
 def add_property(thread_id: int, owner_id: int, name: str):
     conn = _conn()

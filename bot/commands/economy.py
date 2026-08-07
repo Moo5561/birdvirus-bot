@@ -46,6 +46,7 @@ async def apply_tax(ctx, user_id, net_gain):
         return 0
     tax_amount = max(1, int(net_gain * tax_rate / 100))
     await asyncio.to_thread(db.update_balance, user_id, -tax_amount)
+    await asyncio.to_thread(db.update_house, tax_amount)
     collected = await asyncio.to_thread(db.get_config, "tax_collected", "0")
     await asyncio.to_thread(db.set_config, "tax_collected", str(int(collected) + tax_amount))
     return tax_amount
@@ -844,7 +845,18 @@ def setup_economy(client: commands.Bot):
             await ctx.reply(f"no net gambling losses to insure today yet. lose some more then try again 😏")
             return
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, refund)
+        await asyncio.to_thread(db.update_house, -refund)
         await ctx.reply(f"🛡️ insurance payout! you lost {eligible} {coin_emoji} net today, refunded {refund} {coin_emoji} (10%, capped at 500). balance: {new_balance}")
+
+    @pure_house_command := pure_group.command(name="house", description="check the birdvirus house wallet balance")
+    async def pure_house(ctx: commands.Context):
+        house = await asyncio.to_thread(db.get_house)
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        tax_collected = await asyncio.to_thread(db.get_config, "tax_collected", "0")
+        status = "📈 the house is up" if house >= 0 else "📉 the house is in the hole"
+        await ctx.reply(f"🏦 **house wallet:** {house} {coin_emoji} ({status})\n"
+                        f"💰 lifetime tax collected: {int(tax_collected)} {coin_emoji}\n"
+                        f"_gambling losses flow in, wins + streaks + insurance flow out_")
 
     @client.hybrid_command(name="leaderboard", description="view the richest players")
     @app_commands.describe(page="page number to view")
