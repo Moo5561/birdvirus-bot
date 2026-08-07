@@ -1,6 +1,8 @@
 import io
 import random
 import asyncio
+import time
+import aiohttp
 import discord
 import discord.ext.commands as commands
 from discord import app_commands
@@ -12,6 +14,7 @@ from bot.commands import is_admin, is_nightly, game_lock, game_unlock, _s
 
 # birdvirus stock exchange — a fake market for fake coins.
 # every ticker drifts around on a seeded random walk, persisted in stock_state.
+# tickers flagged `real` track their actual stock price instead of a fake walk.
 
 STOCKS = [
     {"ticker": "BIRD", "name": "BirdTech Inc", "emoji": "🐦", "base": 10000, "vol": 0.08, "color": "#00e5ff"},
@@ -23,10 +26,13 @@ STOCKS = [
     {"ticker": "NEST", "name": "NestEgg Realty", "emoji": "🥚", "base": 30000, "vol": 0.06, "color": "#ffdd66"},
     {"ticker": "SCAM", "name": "Totally Legit Coin", "emoji": "🐍", "base": 2500, "vol": 0.25, "color": "#cc44ff"},
     {"ticker": "PLUG", "name": "Plugs & Feathers", "emoji": "🪶", "base": 12000, "vol": 0.14, "color": "#77ccff"},
-    {"ticker": "RBLX", "name": "rblxses.real", "emoji": "🎮", "base": 9000, "vol": 0.18, "color": "#ff8800"},
+    {"ticker": "RBLX", "name": "rblxses.real", "emoji": "🎮", "base": 9000, "vol": 0.18, "color": "#ff8800", "real": True, "symbol": "RBLX"},
 ]
 
 HIST_LEN = 12
+
+REAL_FETCH_COOLDOWN = 45  # seconds between real price fetches
+_real_last_fetch = {}
 
 
 def utc_now_str():
@@ -114,6 +120,15 @@ def ensure_stock(ticker):
         db.set_stock_price(ticker, hist[0], [], utc_now_str())
 
 
+def record_price(ticker, price):
+    """append a price to a ticker's history row and persist it."""
+    hist = db.get_stock_history(ticker)
+    hist.append(int(price))
+    if len(hist) > HIST_LEN:
+        hist = hist[-HIST_LEN:]
+    db.set_stock_price(ticker, int(price), hist, utc_now_str())
+
+
 def drift_ticker(ticker, force_trend=None):
     """random walk the ticker. force_trend (0..1) biases direction for crashes."""
     s = next((x for x in STOCKS if x["ticker"] == ticker), None)
@@ -127,11 +142,30 @@ def drift_ticker(ticker, force_trend=None):
         drift = random.gauss(force_trend - 0.5, vol)
     drift = max(-0.5, min(0.5, drift))
     price = max(100, int(price * (1 + drift)))
-    hist = db.get_stock_history(ticker)
-    hist.append(price)
-    if len(hist) > HIST_LEN:
-        hist = hist[-HIST_LEN:]
-    db.set_stock_price(ticker, price, hist, utc_now_str())
+    record_price(ticker, price)
+
+
+async def fetch_real_price(symbol):
+    """grab the current market price from yahoo finance."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    }
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+    async with aiohttp.ClientSession(headers=headers) as session:
+        async with session.get(
+            url,
+            params={"range": "1d", "interval": "1m"},
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as resp:
+            data = await resp.json()
+    result = data["chart"]["result"]
+    if not result:
+        raise ValueError(f"no chart data for {symbol}")
+    meta = result[0]["meta"]
+    price = meta.get("regularMarketPrice")
+    if price is None:
+        raise ValueError(f"no price for {symbol}")
+    return price
 
 
 def setup_stocks(client: commands.Bot):
@@ -139,9 +173,18 @@ def setup_stocks(client: commands.Bot):
     async def market_loop():
         for s in STOCKS:
             try:
-                await asyncio.to_thread(drift_ticker, s["ticker"])
+                if s.get("real"):
+                    now = time.time()
+                    last = _real_last_fetch.get(s["ticker"], 0)
+                    if now - last < REAL_FETCH_COOLDOWN:
+                        continue
+                    price = await fetch_real_price(s["symbol"])
+                    _real_last_fetch[s["ticker"]] = now
+                    await asyncio.to_thread(record_price, s["ticker"], price)
+                else:
+                    await asyncio.to_thread(drift_ticker, s["ticker"])
             except Exception as e:
-                print(f"error drifting {s['ticker']}: {e}")
+                print(f"error updating {s['ticker']}: {e}")
 
     @client.listen("on_ready")
     async def start_market_loop():
