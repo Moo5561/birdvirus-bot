@@ -114,6 +114,25 @@ def _s(num):
     return s
 
 
+async def claim_streak_bonus(ctx):
+    """grant the once-daily gambling streak bonus. returns bonus amount."""
+    if is_nightly(ctx.bot):
+        return 0
+    streak, bonus = await asyncio.to_thread(db.claim_daily_streak, ctx.author.id)
+    if bonus > 0:
+        await asyncio.to_thread(db.update_balance, ctx.author.id, bonus)
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        await ctx.reply(f"🔥 daily gambling streak — day {streak}! +{bonus} {coin_emoji} streak bonus")
+    return bonus
+
+
+async def track_gamble(ctx, net_gain):
+    """record a settled gamble's net result for daily loss insurance."""
+    if is_nightly(ctx.bot):
+        return
+    await asyncio.to_thread(db.track_gamble_result, ctx.author.id, net_gain)
+
+
 from .blackjack import setup_blackjack
 from .voice import setup_voice
 from .economy import setup_economy

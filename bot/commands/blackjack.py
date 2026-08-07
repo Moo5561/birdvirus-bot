@@ -2,6 +2,7 @@ import random
 import asyncio
 import discord
 import bot.db as db
+from bot.commands import track_gamble
 
 def draw_card():
     suits = ['♠', '♥', '♦', '♣']
@@ -77,6 +78,7 @@ class BlackjackView(discord.ui.View):
             if self._game_unlock:
                 self._game_unlock(self.ctx)
             new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, -self.bet)
+            await track_gamble(self.ctx, -self.bet)
             
             for item in self.children:
                 item.disabled = True
@@ -100,12 +102,15 @@ class BlackjackView(discord.ui.View):
         
         if dealer_score > 21:
             new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, self.bet)
+            await track_gamble(self.ctx, self.bet)
             status_text = f"dealer busted! you won {self.bet} {self.coin_emoji} (balance: {new_balance})"
         elif player_score > dealer_score:
             new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, self.bet)
+            await track_gamble(self.ctx, self.bet)
             status_text = f"you won {self.bet} {self.coin_emoji} (balance: {new_balance})"
         elif player_score < dealer_score:
             new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, -self.bet)
+            await track_gamble(self.ctx, -self.bet)
             status_text = f"you lost {self.bet} {self.coin_emoji} (balance: {new_balance})"
         else:
             status_text = "push! it's a tie. bet refunded"
@@ -130,9 +135,11 @@ class BlackjackView(discord.ui.View):
         
         if dealer_score > 21 or player_score > dealer_score:
             new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, self.bet)
+            await track_gamble(self.ctx, self.bet)
             status_text = f"timed out but you won {self.bet} {self.coin_emoji} (balance: {new_balance})"
         elif player_score < dealer_score:
             new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, -self.bet)
+            await track_gamble(self.ctx, -self.bet)
             status_text = f"timed out and lost {self.bet} {self.coin_emoji} (balance: {new_balance})"
         else:
             status_text = "timed out - pushed (bet refunded)"

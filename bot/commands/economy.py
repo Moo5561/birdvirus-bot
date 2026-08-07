@@ -4,7 +4,7 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
-from bot.commands import is_admin, is_nightly, game_lock, game_unlock, _s
+from bot.commands import is_admin, is_nightly, game_lock, game_unlock, _s, claim_streak_bonus, track_gamble
 from bot.commands.blackjack import BlackjackView, draw_card
 from bot.commands.horserace import HorseRaceView
 from bot.commands.catrace import CatRaceView
@@ -201,11 +201,13 @@ class BirdvirusGameView(discord.ui.View):
                 net_gain = _payout(self.bet, multiplier) - self.bet
                 new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, net_gain)
                 tax = await apply_tax(self.ctx, self.ctx.author.id, net_gain)
+                await track_gamble(self.ctx, net_gain)
                 status = f"correct! there were {self.correct_count} infected birds. you won {net_gain} {self.coin_emoji} (balance: {new_balance}) (tax: {tax} {self.coin_emoji})"
                 color = 0x2ecc71
             else:
                 net_gain = -self.bet
                 new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, net_gain)
+                await track_gamble(self.ctx, net_gain)
                 status = f"wrong! there were {self.correct_count} infected birds. you lost {self.bet} {self.coin_emoji} (balance: {new_balance})"
                 color = 0xe74c3c
                 
@@ -229,6 +231,7 @@ class BirdvirusGameView(discord.ui.View):
             item.disabled = True
         net_gain = -self.bet
         new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, net_gain)
+        await track_gamble(self.ctx, net_gain)
         embed = self.message.embeds[0]
         embed.color = 0xe74c3c
         embed.set_footer(text=f"timed out! you lost {self.bet} {self.coin_emoji} (balance: {new_balance})")
@@ -245,7 +248,7 @@ def setup_economy(client: commands.Bot):
 
     @pure_chance_command := pure_group.command(name="chance", description="gamble your coins on pure chance")
     @app_commands.describe(bet="amount of coins to bet")
-    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.cooldown(1, 2, commands.BucketType.user)
     async def pure_chance(ctx: commands.Context, bet: str):
         bet = _to_bet(bet)
             
@@ -253,7 +256,8 @@ def setup_economy(client: commands.Bot):
         if bal < bet and not is_nightly(ctx.bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
-            
+
+        await claim_streak_bonus(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         win = random.choice([True, False])
         
@@ -261,14 +265,16 @@ def setup_economy(client: commands.Bot):
             net_gain = bet
             new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, bet)
             tax = await apply_tax(ctx, ctx.author.id, net_gain)
+            await track_gamble(ctx, net_gain)
             await ctx.reply(f"you won! doubled your bet of {bet} {coin_emoji} (balance: {new_balance}) (tax: {tax} {coin_emoji})")
         else:
             new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, -bet)
+            await track_gamble(ctx, -bet)
             await ctx.reply(f"you lost {bet} {coin_emoji} unlucky dude (balance: {new_balance})")
 
     @pure_blackjack_command := pure_group.command(name="blackjack", description="play a game of blackjack against the dealer")
     @app_commands.describe(bet="the amount of coins to bet")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 5, commands.BucketType.user)
     async def pure_blackjack(ctx: commands.Context, bet: str):
         bet = _to_bet(bet)
             
@@ -277,6 +283,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {balance_val})")
             return
 
+        await claim_streak_bonus(ctx)
         game_lock(ctx)
             
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
@@ -297,6 +304,7 @@ def setup_economy(client: commands.Bot):
                 payout = _payout(bet, 1.5)
                 new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, payout)
                 tax = await apply_tax(ctx, ctx.author.id, payout)
+                await track_gamble(ctx, payout)
                 await ctx.reply(f"natural blackjack! you won {payout} {coin_emoji} (balance: {new_balance}) (tax: {tax} {coin_emoji})")
             return
 
@@ -305,7 +313,7 @@ def setup_economy(client: commands.Bot):
 
     @pure_slots_command := pure_group.command(name="slots", description="play slots and try to win big")
     @app_commands.describe(bet="the amount of coins to bet")
-    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.cooldown(1, 2, commands.BucketType.user)
     async def pure_slots(ctx: commands.Context, bet: str):
         bet = _to_bet(bet)
             
@@ -313,7 +321,8 @@ def setup_economy(client: commands.Bot):
         if bal < bet and not is_nightly(ctx.bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
-            
+
+        await claim_streak_bonus(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         emojis = ['🍒', '🍋', '🍇', '🔔', '💎', '7️⃣']
         
@@ -365,7 +374,7 @@ def setup_economy(client: commands.Bot):
                 multiplier = 2.5
                 status = f"two of a kind ({pair})!"
             else:
-                multiplier = 1.5
+                multiplier = 2
                 status = f"two of a kind ({pair})!"
         else:
             multiplier = 0
@@ -377,7 +386,8 @@ def setup_economy(client: commands.Bot):
             net_gain = -bet
 
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
-        
+        await track_gamble(ctx, net_gain)
+
         if net_gain > 0:
             tax = await apply_tax(ctx, ctx.author.id, net_gain)
             status_text = f"{status}\nyou won {net_gain} {coin_emoji}! (balance: {new_balance}) (tax: {tax} {coin_emoji})"
@@ -395,7 +405,7 @@ def setup_economy(client: commands.Bot):
         bet="the amount of coins to bet",
         guess="where to bet: red, black, even, odd, high (19-36), low (1-18), or a specific number (0-36)"
     )
-    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.cooldown(1, 2, commands.BucketType.user)
     async def pure_roulette(ctx: commands.Context, bet: str, guess: str):
         bet = _to_bet(bet)
             
@@ -403,7 +413,8 @@ def setup_economy(client: commands.Bot):
         if bal < bet and not is_nightly(ctx.bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
-            
+
+        await claim_streak_bonus(ctx)
         guess_clean = guess.strip().lower()
         
         is_number = False
@@ -493,6 +504,7 @@ def setup_economy(client: commands.Bot):
             net_gain = -bet
 
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
+        await track_gamble(ctx, net_gain)
 
         if win:
             tax = await apply_tax(ctx, ctx.author.id, net_gain)
@@ -507,8 +519,8 @@ def setup_economy(client: commands.Bot):
         await message.edit(embed=embed)
 
     @pure_insaneroll_command := pure_group.command(name="insaneroll", description="roll a d20 with insane stakes")
-    @app_commands.describe(bet="the amount of coins to bet")
-    @commands.cooldown(1, 3, commands.BucketType.user)
+    @app_commands.describe(bet="amount of coins to bet")
+    @commands.cooldown(1, 2, commands.BucketType.user)
     async def pure_insaneroll(ctx: commands.Context, bet: str):
         bet = _to_bet(bet)
             
@@ -516,7 +528,8 @@ def setup_economy(client: commands.Bot):
         if bal < bet and not is_nightly(ctx.bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
-            
+
+        await claim_streak_bonus(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "dYT")
         
         roll = random.randint(1, 20)
@@ -560,7 +573,9 @@ def setup_economy(client: commands.Bot):
             net_gain = _payout(bet, multiplier) - bet
             new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
             tax = await apply_tax(ctx, ctx.author.id, net_gain)
-            
+
+        await track_gamble(ctx, net_gain)
+
         if multiplier <= 0:
             color = 0xe74c3c if roll != 1 else 0x992d22
             status_text = f"**d20 ROLL: {roll}**\n{status}\nyou lost {abs(net_gain)} {coin_emoji}. (holding balance: {new_balance})"
@@ -581,6 +596,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal_val})")
             return
 
+        await claim_streak_bonus(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
 
         game_lock(ctx)
@@ -620,7 +636,7 @@ def setup_economy(client: commands.Bot):
 
     @pure_plinko_command := pure_group.command(name="plinko", description="drop the ball down the plinko board")
     @app_commands.describe(bet="amount of coins to bet")
-    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.cooldown(1, 2, commands.BucketType.user)
     async def pure_plinko(ctx: commands.Context, bet: str):
         bet = _to_bet(bet)
 
@@ -629,9 +645,10 @@ def setup_economy(client: commands.Bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal_val})")
             return
 
+        await claim_streak_bonus(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
 
-        multipliers = [15, 5, 2, 0.5, 2, 5, 15]
+        multipliers = [15, 5, 2, 1, 2, 5, 15]
         slot_labels = ['💀', '🔴', '🟠', '🟡', '🟠', '🔴', '💀']
 
         pos = 3
@@ -665,10 +682,11 @@ def setup_economy(client: commands.Bot):
         await asyncio.sleep(0.5)
 
         slots_row = ' '.join(slot_labels)
-        mults_row = '15x 5x 2x .5 2x 5x 15x'
+        mults_row = '15x 5x 2x 1x 2x 5x 15x'
 
         net_gain = _payout(bet, multiplier) - bet
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
+        await track_gamble(ctx, net_gain)
 
         if net_gain > 0:
             tax = await apply_tax(ctx, ctx.author.id, net_gain)
@@ -696,7 +714,7 @@ def setup_economy(client: commands.Bot):
 
     @pure_plinkohard_command := pure_group.command(name="plinkohard", description="HARD MODE plinko - higher risk, higher reward")
     @app_commands.describe(bet="amount of coins to bet")
-    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.cooldown(1, 2, commands.BucketType.user)
     async def pure_plinkohard(ctx: commands.Context, bet: str):
         bet = _to_bet(bet)
 
@@ -705,6 +723,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal_val})")
             return
 
+        await claim_streak_bonus(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
 
         multipliers = [50, 15, 3, 0.3, 0.3, 3, 15, 50]
@@ -746,6 +765,7 @@ def setup_economy(client: commands.Bot):
 
         net_gain = _payout(bet, multiplier) - bet
         new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, net_gain)
+        await track_gamble(ctx, net_gain)
 
         if net_gain > 0:
             tax = await apply_tax(ctx, ctx.author.id, net_gain)
@@ -773,7 +793,7 @@ def setup_economy(client: commands.Bot):
 
     @pure_horse_command := pure_group.command(name="horse", description="bet on a horse race at the birdvirus track")
     @app_commands.describe(bet="the amount of coins to bet")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 5, commands.BucketType.user)
     async def pure_horse(ctx: commands.Context, bet: str):
         bet = _to_bet(bet)
 
@@ -782,6 +802,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
 
+        await claim_streak_bonus(ctx)
         game_lock(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         cheat = take_cheat(ctx.author.id, "race_boost")
@@ -791,7 +812,7 @@ def setup_economy(client: commands.Bot):
 
     @pure_catrace_command := pure_group.command(name="catrace", description="bet on a cat race at the birdvirus track")
     @app_commands.describe(bet="the amount of coins to bet")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 5, commands.BucketType.user)
     async def pure_catrace(ctx: commands.Context, bet: str):
         bet = _to_bet(bet)
 
@@ -800,12 +821,30 @@ def setup_economy(client: commands.Bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
 
+        await claim_streak_bonus(ctx)
         game_lock(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         cheat = take_cheat(ctx.author.id, "race_boost")
         boost = cheat["value"] if cheat else 0
         view = CatRaceView(ctx, bet, coin_emoji, game_unlock, cheat_boost=boost)
         await view.start(ctx)
+
+    @pure_insurance_command := pure_group.command(name="insurance", description="claim a partial refund on today's net gambling losses")
+    @commands.cooldown(1, 60, commands.BucketType.user)
+    async def pure_insurance(ctx: commands.Context):
+        if is_nightly(ctx.bot):
+            await ctx.reply("nightly bot doesn't need insurance")
+            return
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        refund, eligible, claimed = await asyncio.to_thread(db.claim_insurance, ctx.author.id)
+        if claimed:
+            await ctx.reply(f"you already claimed today's insurance. come back tomorrow 📉")
+            return
+        if refund <= 0:
+            await ctx.reply(f"no net gambling losses to insure today yet. lose some more then try again 😏")
+            return
+        new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, refund)
+        await ctx.reply(f"🛡️ insurance payout! you lost {eligible} {coin_emoji} net today, refunded {refund} {coin_emoji} (10%, capped at 500). balance: {new_balance}")
 
     @client.hybrid_command(name="leaderboard", description="view the richest players")
     @app_commands.describe(page="page number to view")

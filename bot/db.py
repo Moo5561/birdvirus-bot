@@ -1,7 +1,7 @@
 import sqlite3
 import os
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 
 DB_PATH = os.environ.get("BOT_DB_PATH", "birdvirus.db")
 
@@ -119,6 +119,26 @@ def init_db():
             item TEXT,
             quantity INTEGER DEFAULT 1,
             PRIMARY KEY (user_id, item)
+        )
+    """)
+
+    # daily gambling streak table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS gamble_streaks (
+            user_id INTEGER PRIMARY KEY,
+            last_day TEXT,
+            streak INTEGER DEFAULT 0
+        )
+    """)
+
+    # daily gambling net result (for loss insurance)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS gamble_daily (
+            user_id INTEGER,
+            day TEXT,
+            net INTEGER DEFAULT 0,
+            insurance_claimed INTEGER DEFAULT 0,
+            PRIMARY KEY (user_id, day)
         )
     """)
 
@@ -588,6 +608,104 @@ def has_item(user_id: int, item: str) -> bool:
     row = cursor.fetchone()
     cursor.close()
     return row is not None
+
+
+# Gambling streak + loss insurance
+def _today() -> str:
+    return datetime.utcnow().strftime("%Y-%m-%d")
+
+
+def claim_daily_streak(user_id: int) -> tuple[int, int]:
+    """returns (streak, bonus). bonus is 0 if already claimed today.
+    streak grows by 1 each consecutive day you gamble, resets on a missed day."""
+    today = _today()
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT last_day, streak FROM gamble_streaks WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    if row is None:
+        cursor.execute(
+            "INSERT INTO gamble_streaks (user_id, last_day, streak) VALUES (?, ?, 1)",
+            (user_id, today),
+        )
+        conn.commit()
+        cursor.close()
+        return 1, min(1 * 25, 500)
+    last_day, streak = row
+    if last_day == today:
+        cursor.close()
+        return streak, 0
+    if last_day is not None:
+        try:
+            last = datetime.strptime(last_day, "%Y-%m-%d").date()
+            cur = datetime.strptime(today, "%Y-%m-%d").date()
+            streak = streak + 1 if (cur - last).days == 1 else 1
+        except ValueError:
+            streak = 1
+    else:
+        streak = 1
+    bonus = min(streak * 25, 500)
+    cursor.execute(
+        "UPDATE gamble_streaks SET last_day = ?, streak = ? WHERE user_id = ?",
+        (today, streak, user_id),
+    )
+    conn.commit()
+    cursor.close()
+    return streak, bonus
+
+
+def track_gamble_result(user_id: int, net_gain: int):
+    """accumulate today's net gambling result (for loss insurance)."""
+    today = _today()
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT net FROM gamble_daily WHERE user_id = ? AND day = ?",
+        (user_id, today),
+    )
+    row = cursor.fetchone()
+    if row is None:
+        cursor.execute(
+            "INSERT INTO gamble_daily (user_id, day, net, insurance_claimed) VALUES (?, ?, ?, 0)",
+            (user_id, today, int(net_gain)),
+        )
+    else:
+        cursor.execute(
+            "UPDATE gamble_daily SET net = ? WHERE user_id = ? AND day = ?",
+            (row[0] + int(net_gain), user_id, today),
+        )
+    conn.commit()
+    cursor.close()
+
+
+def claim_insurance(user_id: int) -> tuple[int, int, bool]:
+    """returns (refund, eligible_losses, already_claimed). refund 10% of today's
+    net losses, capped. marks the day as claimed only when a refund is paid."""
+    today = _today()
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT net, insurance_claimed FROM gamble_daily WHERE user_id = ? AND day = ?",
+        (user_id, today),
+    )
+    row = cursor.fetchone()
+    if row is None:
+        cursor.close()
+        return 0, 0, False
+    net, claimed = row
+    if claimed:
+        cursor.close()
+        return 0, max(0, -net), True
+    eligible = max(0, -net)
+    refund = min(int(eligible * 0.10), 500)
+    if refund > 0:
+        cursor.execute(
+            "UPDATE gamble_daily SET insurance_claimed = 1 WHERE user_id = ? AND day = ?",
+            (user_id, today),
+        )
+        conn.commit()
+    cursor.close()
+    return refund, eligible, False
 
 
 init_db()
