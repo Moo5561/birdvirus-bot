@@ -23,6 +23,7 @@ STOCKS = [
     {"ticker": "NEST", "name": "NestEgg Realty", "emoji": "🥚", "base": 30000, "vol": 0.06, "color": "#ffdd66"},
     {"ticker": "SCAM", "name": "Totally Legit Coin", "emoji": "🐍", "base": 2500, "vol": 0.25, "color": "#cc44ff"},
     {"ticker": "PLUG", "name": "Plugs & Feathers", "emoji": "🪶", "base": 12000, "vol": 0.14, "color": "#77ccff"},
+    {"ticker": "RBLX", "name": "rblxses.real", "emoji": "🎮", "base": 9000, "vol": 0.18, "color": "#ff8800"},
 ]
 
 HIST_LEN = 12
