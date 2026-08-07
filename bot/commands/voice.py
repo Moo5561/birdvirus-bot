@@ -1,14 +1,26 @@
 import random
 import asyncio
 import os
+import re
 import discord
 import discord.ext.commands as commands
 from discord.ext import tasks
 from discord import app_commands
 import bot.db as db
 from bot.commands import audio_queues, voice_joiners
+from bot.config import OWNER_IDS
 
-last_temp_sources = {}
+AUDIO_EXTS = (".mp3", ".wav", ".ogg", ".m4a", ".aac")
+
+# guild id -> the temp file currently being played, so it can be deleted when it ends
+current_temp_sources = {}
+
+
+def temp_path(guild_id, user_id, filename):
+    """where an uploaded file gets saved. the name comes from the uploader, so
+    strip it down to a basename with no path separators before using it."""
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(filename)).lstrip(".")
+    return f"mp3/temp_{guild_id}_{user_id}_{safe or 'audio.mp3'}"
 
 
 def cleanup_temp(source):
@@ -19,34 +31,33 @@ def cleanup_temp(source):
             pass
 
 
+def _play(vc, guild_id, source):
+    vol = 1.0 if "badapple_max" in source else 0.60
+    actual_source = source if (source.startswith("mp3/") or source.startswith("http")) else f"mp3/{source}"
+    if source.startswith("mp3/temp_"):
+        current_temp_sources[guild_id] = source
+    audio_source = discord.PCMVolumeTransformer(
+        discord.FFmpegPCMAudio(actual_source), volume=vol
+    )
+    vc.play(audio_source, after=lambda e: play_next(e, vc, guild_id))
+
+
 def play_next(error, vc, guild_id):
     if error:
         print(f"player error: {error}")
 
+    # whatever just finished is done with its file
+    cleanup_temp(current_temp_sources.pop(guild_id, None))
+
     if guild_id in audio_queues and len(audio_queues[guild_id]) > 0:
-        source = audio_queues[guild_id].pop(0)
-        vol = 1.0 if "badapple_max" in source else 0.60
-        actual_source = source if (source.startswith("mp3/") or source.startswith("http")) else f"mp3/{source}"
-        audio_source = discord.PCMVolumeTransformer(
-            discord.FFmpegPCMAudio(actual_source), volume=vol
-        )
-        vc.play(audio_source, after=lambda e: play_next(e, vc, guild_id))
-    else:
-        cleanup_temp(last_temp_sources.pop(guild_id, None))
+        _play(vc, guild_id, audio_queues[guild_id].pop(0))
 
 
 def queue_audio(vc, source):
     guild_id = vc.guild.id
-    if source.startswith("mp3/temp_"):
-        last_temp_sources[guild_id] = source
 
     if not vc.is_playing():
-        vol = 1.0 if "badapple_max" in source else 0.60
-        actual_source = source if (source.startswith("mp3/") or source.startswith("http")) else f"mp3/{source}"
-        audio_source = discord.PCMVolumeTransformer(
-            discord.FFmpegPCMAudio(actual_source), volume=vol
-        )
-        vc.play(audio_source, after=lambda e: play_next(e, vc, guild_id))
+        _play(vc, guild_id, source)
     else:
         if guild_id not in audio_queues:
             audio_queues[guild_id] = []
@@ -79,6 +90,10 @@ def setup_voice(client: commands.Bot):
 
     @vc_group.command(name="join", description="join a voice channel")
     async def vc_join(ctx: commands.Context):
+        if ctx.guild is None:
+            await ctx.reply("voice commands only work in a server")
+            return
+
         if ctx.author.voice is None:
             await ctx.reply("you're not in a voice channel")
             return
@@ -97,6 +112,10 @@ def setup_voice(client: commands.Bot):
 
     @vc_group.command(name="leave", description="leave the voice channel")
     async def vc_leave(ctx: commands.Context):
+        if ctx.guild is None:
+            await ctx.reply("voice commands only work in a server")
+            return
+
         guild_id = ctx.guild.id
         joiner_id = voice_joiners.get(guild_id)
 
@@ -106,17 +125,8 @@ def setup_voice(client: commands.Bot):
         elif ctx.author.id == joiner_id:
             is_authorized = True
         else:
-            AUTHORIZED_USERS = [
-                1048423590623727686,
-                1278489064210956378,
-                1421940246492352612,
-                1246945967102623755,
-                1488967988207157308,
-                274556515061465088,
-                983544114635235430,
-            ]
             if (
-                ctx.author.id in AUTHORIZED_USERS
+                ctx.author.id in OWNER_IDS
                 or ctx.author.guild_permissions.administrator
             ):
                 is_authorized = True
@@ -140,7 +150,7 @@ def setup_voice(client: commands.Bot):
                 audio_queues[guild_id].clear()
             if guild_id in voice_joiners:
                 del voice_joiners[guild_id]
-            cleanup_temp(last_temp_sources.pop(guild_id, None))
+            cleanup_temp(current_temp_sources.pop(guild_id, None))
             await ctx.voice_client.disconnect()
             await ctx.reply("left")
         else:
@@ -221,37 +231,20 @@ def setup_voice(client: commands.Bot):
 
         source = None
         display_name = ""
-        if file:
-            if any(
-                file.filename.lower().endswith(ext)
-                for ext in [".mp3", ".wav", ".ogg", ".m4a", ".aac"]
-            ):
-                os.makedirs("mp3", exist_ok=True)
-                filename = f"mp3/temp_{ctx.guild.id}_{file.filename}"
-                await file.save(filename)
-                source = filename
-                display_name = file.filename
-            else:
+        attachment = file or (
+            ctx.message.attachments[0] if ctx.message and ctx.message.attachments else None
+        )
+        if attachment:
+            if not attachment.filename.lower().endswith(AUDIO_EXTS):
                 await ctx.reply(
                     "invalid file type. please upload an mp3, wav, ogg, m4a, or aac file"
                 )
                 return
-        elif ctx.message and ctx.message.attachments:
-            attachment = ctx.message.attachments[0]
-            if any(
-                attachment.filename.lower().endswith(ext)
-                for ext in [".mp3", ".wav", ".ogg", ".m4a", ".aac"]
-            ):
-                os.makedirs("mp3", exist_ok=True)
-                filename = f"mp3/temp_{ctx.guild.id}_{attachment.filename}"
-                await attachment.save(filename)
-                source = filename
-                display_name = attachment.filename
-            else:
-                await ctx.reply(
-                    "invalid attachment type. please upload an mp3, wav, ogg, m4a, or aac file"
-                )
-                return
+            os.makedirs("mp3", exist_ok=True)
+            filename = temp_path(ctx.guild.id, ctx.author.id, attachment.filename)
+            await attachment.save(filename)
+            source = filename
+            display_name = attachment.filename
         elif link:
             link_clean = link.strip()
             if (

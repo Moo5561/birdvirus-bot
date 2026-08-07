@@ -8,10 +8,10 @@ from discord.ext.commands.view import StringView
 from discord.ext.commands.context import Context
 import bot.events
 import bot.commands
-from bot.config import token
+from bot.config import token, NIGHTLY_BOT_ID
 
 bot_id = int(base64.b64decode(token.split(".")[0] + "==").decode())
-if bot_id == 1522117141090799697:
+if bot_id == NIGHTLY_BOT_ID:
     os.environ["BOT_DB_PATH"] = "birdvirus_nightly.db"
 
 logging.basicConfig(
@@ -26,7 +26,7 @@ args = parser.parse_args()
 
 
 def get_prefix(bot, message):
-    if bot.user and bot.user.id == 1522117141090799697:
+    if bot.user and bot.user.id == NIGHTLY_BOT_ID:
         return "ht!"
     return "%"
 

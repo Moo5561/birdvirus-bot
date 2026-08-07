@@ -323,8 +323,8 @@ def update_debt(user_id: int, change: int) -> int:
     cursor.execute("SELECT debt FROM economy WHERE user_id = ?", (user_id,))
     row = cursor.fetchone()
     if row is None:
-        new_debt = change
-        cursor.execute("INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', ?)", (user_id, str(abs(change)) if change < 0 else '0'))
+        new_debt = max(0, change)
+        cursor.execute("INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', ?)", (user_id, str(new_debt)))
     else:
         new_debt = int(row[0] or 0) + change
         if new_debt < 0:

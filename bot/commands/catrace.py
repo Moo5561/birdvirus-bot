@@ -4,6 +4,7 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
+from bot.commands import is_nightly
 
 
 def _payout(bet, mult):
@@ -231,8 +232,7 @@ class CatRaceView(discord.ui.View):
         if (
             bal < self.bet
             and (
-                not self.ctx.bot.user
-                or self.ctx.bot.user.id != 1522117141090799697
+                not is_nightly(self.ctx.bot)
             )
         ):
             await interaction.response.edit_message(
