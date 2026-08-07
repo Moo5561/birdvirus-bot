@@ -117,8 +117,9 @@ def _s(num):
     """abbreviate a number: 1234 -> 1.2k, 5678900 -> 5.7m"""
     sign = "-" if num < 0 else ""
     n = abs(num)
-    if n >= 1_000_000_000_000_000_000:  # very big, just show raw
-        s = str(n)
+    if n >= 1_000_000_000_000_000_000:
+        digits = str(n)
+        s = f"{digits[0]}.{digits[1:4]}e+{len(digits)-1}"
     elif n >= 1_000_000_000_000_000:
         s = f"{n // 1_000_000_000_000_000}q"
     elif n >= 1_000_000_000_000:
