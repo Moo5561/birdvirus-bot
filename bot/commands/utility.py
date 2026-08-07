@@ -545,6 +545,10 @@ def setup_utility(client: commands.Bot):
 
             if response is None or not response.data:
                 error_msg = str(last_error) if last_error else "all tts providers failed"
+                if ")]}'" in error_msg or "wrb.fr" in error_msg:
+                    error_msg = "gemini tts blocked by google anti-bot (try again later)"
+                if "vercel" in error_msg.lower() and ("rate" in error_msg.lower() or "429" in error_msg):
+                    error_msg = "openai.fm rate limited (try again in a minute)"
                 if len(error_msg) > 1900:
                     error_msg = error_msg[:1900] + "..."
                 await ctx.reply(f"error generating tts: {error_msg}")
@@ -569,6 +573,10 @@ def setup_utility(client: commands.Bot):
                 await ctx.reply(f"queued tts 🗣️")
         except Exception as e:
             error_msg = str(e)
+            if ")]}'" in error_msg or "wrb.fr" in error_msg:
+                error_msg = "gemini tts blocked by google anti-bot (try again later)"
+            if "vercel" in error_msg.lower() and ("rate" in error_msg.lower() or "429" in error_msg):
+                error_msg = "openai.fm rate limited (try again in a minute)"
             if len(error_msg) > 1900:
                 error_msg = error_msg[:1900] + "..."
             await ctx.reply(f"error generating tts: {error_msg}")
