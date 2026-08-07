@@ -33,11 +33,17 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Pages
         uses: actions/configure-pages@v5
+      - name: Assemble site
+        # only the public site gets published. uploading the repo root would
+        # expose birdvirus.db (balances + discord ids) and bot/banned_users.txt.
+        run: |
+          mkdir -p _site/birdvirus-cloud
+          cp site/*.html _site/
+          cp birdvirus-cloud/index.html birdvirus-cloud/styles.css birdvirus-cloud/app.js _site/birdvirus-cloud/
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
-          path: '.'
+          path: '_site'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
