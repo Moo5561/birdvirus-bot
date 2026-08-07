@@ -52,7 +52,7 @@ def setup_utility(client: commands.Bot):
             ping_endpoint('duckduckgo', 'https://duckduckgo.com/'),
         )
 
-        uptime_delta = datetime.datetime.now(datetime.timezone.utc) - client.start_time
+        uptime_delta = datetime.datetime.now(datetime.timezone.utc) - getattr(client, "start_time", discord.utils.utcnow())
         total_seconds = int(uptime_delta.total_seconds())
         days, remainder = divmod(total_seconds, 86400)
         hours, remainder = divmod(remainder, 3600)
@@ -179,7 +179,11 @@ def setup_utility(client: commands.Bot):
         embed.timestamp = discord.utils.utcnow()
 
         file = discord.File(buf, filename="latency_chart.png")
-        await msg.edit(content="", embed=embed, file=file)
+        try:
+            await msg.delete()
+        except:
+            pass
+        await ctx.reply(embed=embed, file=file)
 
     # gif
     @client.hybrid_command(name="gif", description="get a free cool gif from my gifs")
@@ -229,6 +233,46 @@ def setup_utility(client: commands.Bot):
             await ctx.reply(f"birdvirus bot\n{content}\ncurrent host: `{host}`")
         except Exception:
             await ctx.reply(f"birdvirus bot\ncommit: unknown\ncurrent host: `{host}`")
+
+    # vote
+    @client.hybrid_command(name="vote", description="claim your top.gg vote reward (15k coins, once every 12h)")
+    async def vote_cmd(ctx: commands.Context):
+        topgg_token = os.environ.get("TOPGG_TOKEN")
+        if not topgg_token:
+            await ctx.reply("top.gg voting is not configured (missing TOPGG_TOKEN env var)")
+            return
+
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+
+        last_claim = await asyncio.to_thread(db.get_config, f"vote_claimed_{ctx.author.id}", "")
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if last_claim:
+            try:
+                last = datetime.datetime.fromisoformat(last_claim)
+                if (now - last).total_seconds() < 43200:  # 12 hours
+                    remaining = 43200 - int((now - last).total_seconds())
+                    h, m = divmod(remaining // 60, 60)
+                    await ctx.reply(f"you already claimed your vote reward. next vote available in {h}h {m}m")
+                    return
+            except ValueError:
+                pass
+
+        try:
+            bot_id = client.user.id if client.user else 1518310857598308433
+            url = f"https://top.gg/api/bots/{bot_id}/check?userId={ctx.author.id}"
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers={"Authorization": topgg_token}, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    data = await resp.json()
+            if not data.get("voted"):
+                await ctx.reply(f"you haven't voted yet! vote at https://top.gg/bot/{bot_id}/vote then come back and claim your 15000 {coin_emoji}")
+                return
+        except Exception as e:
+            await ctx.reply(f"couldn't check your vote status right now. try again later. ({str(e)[:200]})")
+            return
+
+        await asyncio.to_thread(db.set_config, f"vote_claimed_{ctx.author.id}", now.isoformat())
+        new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, 15000)
+        await ctx.reply(f"✅ thanks for voting! +15000 {coin_emoji} (balance: {new_balance})")
 
     # chat
     @client.hybrid_command(name="chat", description="chat with the birdvirus bot")
@@ -571,6 +615,10 @@ def setup_utility(client: commands.Bot):
 
             if response is None or not response.data:
                 error_msg = str(last_error) if last_error else "all tts providers failed"
+                if ")]}'" in error_msg or "wrb.fr" in error_msg:
+                    error_msg = "gemini tts blocked by google anti-bot (try again later)"
+                if "vercel" in error_msg.lower() and ("rate" in error_msg.lower() or "429" in error_msg):
+                    error_msg = "openai.fm rate limited (try again in a minute)"
                 if len(error_msg) > 1900:
                     error_msg = error_msg[:1900] + "..."
                 await ctx.reply(f"error generating tts: {error_msg}")
@@ -595,6 +643,10 @@ def setup_utility(client: commands.Bot):
                 await ctx.reply(f"queued tts 🗣️")
         except Exception as e:
             error_msg = str(e)
+            if ")]}'" in error_msg or "wrb.fr" in error_msg:
+                error_msg = "gemini tts blocked by google anti-bot (try again later)"
+            if "vercel" in error_msg.lower() and ("rate" in error_msg.lower() or "429" in error_msg):
+                error_msg = "openai.fm rate limited (try again in a minute)"
             if len(error_msg) > 1900:
                 error_msg = error_msg[:1900] + "..."
             await ctx.reply(f"error generating tts: {error_msg}")

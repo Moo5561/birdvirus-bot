@@ -4,7 +4,7 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
-from bot.commands import is_nightly
+from bot.commands import is_nightly, track_gamble
 
 
 def _payout(bet, mult):
@@ -212,6 +212,7 @@ class HorseRaceView(discord.ui.View):
             net_gain = -self.bet
 
         new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, net_gain)
+        await track_gamble(self.ctx, net_gain)
         tied = len([p for p in positions if p == max(positions)]) > 1
 
         result_embed = self.get_result_embed(winner_idx, net_gain, new_balance, tied=tied)

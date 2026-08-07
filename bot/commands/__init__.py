@@ -76,6 +76,22 @@ async def _is_configured_admin(user_id: int) -> bool:
     return False
 
 
+def is_dev():
+    async def predicate(ctx: commands.Context):
+        AUTHORIZED_USERS = [
+            1048423590623727686,
+            1278489064210956378,
+            1421940246492352612,
+            1246945967102623755,
+            1488967988207157308,
+            274556515061465088,
+            983544114635235430,
+        ]
+        return ctx.author.id in AUTHORIZED_USERS
+
+    return commands.check(predicate)
+
+
 def is_admin():
     async def predicate(ctx: commands.Context):
         if await _is_configured_admin(ctx.author.id):
@@ -98,20 +114,52 @@ def is_bot_dev():
 
 
 def _s(num):
-    """abbreviate a number: 1234 -> 1.2k, 5678900 -> 5.7m, huge -> 3.9e+81"""
-    if num >= 1_000_000_000_000_000:
-        return f"{num:.15e}"
-    if num >= 1_000_000_000:
-        s = f"{num / 1_000_000_000:.1f}b"
-    elif num >= 1_000_000:
-        s = f"{num / 1_000_000:.1f}m"
-    elif num >= 1_000:
-        s = f"{num / 1_000:.1f}k"
+    """abbreviate a number: 1234 -> 1.2k, 5678900 -> 5.7m"""
+    sign = "-" if num < 0 else ""
+    n = abs(num)
+    if n >= 1_000_000_000_000_000_000:  # very big, just show raw
+        s = str(n)
+    elif n >= 1_000_000_000_000_000:
+        s = f"{n // 1_000_000_000_000_000}q"
+    elif n >= 1_000_000_000_000:
+        s = f"{n // 1_000_000_000_000}t"
+    elif n >= 1_000_000_000:
+        s = f"{n / 1_000_000_000:.1f}b"
+    elif n >= 1_000_000:
+        s = f"{n / 1_000_000:.1f}m"
+    elif n >= 1_000:
+        s = f"{n / 1_000:.1f}k"
     else:
-        s = str(num)
-    if s.endswith(".0") and s[-3].isdigit():
+        s = str(n)
+    if s.endswith(".0") and len(s) > 2 and s[-3].isdigit():
         s = s[:-2]
-    return s
+    return sign + s
+
+async def claim_streak_bonus(ctx):
+    """grant the once-daily gambling streak bonus. returns bonus amount."""
+    if is_nightly(ctx.bot):
+        return 0
+    streak, bonus = await asyncio.to_thread(db.claim_daily_streak, ctx.author.id)
+    if bonus > 0:
+        await asyncio.to_thread(db.update_balance, ctx.author.id, bonus)
+        await asyncio.to_thread(db.update_house, -bonus)
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        await ctx.reply(f"🔥 daily gambling streak — day {streak}! +{bonus} {coin_emoji} streak bonus")
+    return bonus
+
+
+async def track_gamble(ctx, net_gain):
+    """record a settled gamble's net result for daily loss insurance, and route money through the house wallet."""
+    if is_nightly(ctx.bot):
+        return
+    if net_gain > 0:
+        rake_pct = int(await asyncio.to_thread(db.get_config, "house_rake", "25") or "25")
+        if rake_pct > 0:
+            rake = max(1, int(net_gain * rake_pct / 100))
+            await asyncio.to_thread(db.update_balance, ctx.author.id, -rake)
+            net_gain -= rake
+    await asyncio.to_thread(db.track_gamble_result, ctx.author.id, net_gain)
+    await asyncio.to_thread(db.update_house, -net_gain)
 
 
 from .blackjack import setup_blackjack
