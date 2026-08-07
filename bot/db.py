@@ -424,6 +424,16 @@ def get_house() -> int:
     return int(row[0]) if row and row[0] else 0
 
 
+def execute(query: str, params: tuple = ()):
+    """run a raw query on the db. used for pings/health checks."""
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    cursor.close()
+    return rows
+
+
 def update_house(change: int) -> int:
     """atomically adjust the house wallet balance. returns new balance."""
     conn = _conn()
