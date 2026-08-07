@@ -55,7 +55,7 @@ all commands are hybrid — slash and prefix both work. prefix is `%` for the ma
 | stocks | `/stock market`, `/stock buy`, `/stock sell`, `/stock portfolio` |
 | shop | `/shop`, `/buy`, `/inv`, `/use` |
 | jobs | `/job list`, `/job info`, `/job apply`, `/job work`, `/job quit`, `/job beg` |
-| voice | `/vc join`, `/vc leave`, `/vc stop`, `/vc bird`, `/vc droid`, `/play`, `/stop`, `/bad apple` |
+| voice | `/vc join`, `/vc leave`, `/vc stop`, `/vc bird`, `/play`, `/stop`, `/bad apple` |
 | properties | `/property register`, `/property buy`, `/property remove`, `/property invite`, `/property kick` |
 | utility | `/ping`, `/gif`, `/version`, `/vote`, `/chat`, `/chat_reset`, `/say`, `/eatbomb`, `/tts`, `/numbairy`, `/internet search` |
 | admin | `/ban`, `/unban`, `/view say`, `/view logs`, `/clear saylist`, `/giveitem`, `/removeitem`, `/setshop`, `/setillegal` |

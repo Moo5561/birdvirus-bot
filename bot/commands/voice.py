@@ -195,20 +195,6 @@ def setup_voice(client: commands.Bot):
         except Exception as e:
             await ctx.reply(f"error playing audio: {e}")
 
-    @vc_group.command(
-        name="droid", description="play a droid sound in the voice channel"
-    )
-    async def vc_droid(ctx: commands.Context):
-        if ctx.voice_client is None:
-            await ctx.reply("i'm not in a voice channel. use `/vc join` first")
-            return
-
-        try:
-            queue_audio(ctx.voice_client, "droid.mp3")
-            await ctx.reply("queued: `droid`")
-        except Exception as e:
-            await ctx.reply(f"error queueing audio: {e}")
-
     @client.hybrid_command(
         name="stop", description="stop the audio playback and clear the queue"
     )
