@@ -81,6 +81,6 @@ TTS goes through `g4f` with an ordered provider fallback (OpenAIFM → Gemini) b
 
 ## conventions
 
-- format coin amounts with `_s()` from `bot/commands/__init__.py` (`1.2k`, `5.7m`, scientific past a quadrillion). Note that the scientific branch is currently unimplemented — values ≥ 1e18 print raw.
+- format coin amounts with `_s()` from `bot/commands/__init__.py` — `k`/`m`/`b` are rounded to one decimal, `t`/`q` are integer-truncated, and anything ≥ 1e18 switches to scientific (`1.234e+19`).
 - consume shop items with `take_cheat(user_id, type)` from `bot/commands/shop.py`, not `ACTIVE_CHEATS.pop()` — a bare pop burns whatever unrelated item the user had active.
 - economy games settle in ~20 distinct places across `economy.py` and the View classes. A new game means a new settle site, and the house/rake/tax hooks have to be added by hand.
