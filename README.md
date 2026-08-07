@@ -1,6 +1,6 @@
-# birdvirus-bot
+![birdvirus bot](birdvirusbot.png)
 
-<img src="birdvirusbot.png" width="120" align="right">
+# birdvirus-bot
 
 the official discord bot for the birdvirus community. multipurpose economy, audio, and ai chat bot built with discord.py.
 
