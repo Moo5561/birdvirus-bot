@@ -7,7 +7,7 @@ import bot.db as db
 import bot.bans as bans
 import os
 from bot.commands import is_admin, is_bot_dev, _is_configured_admin, _s
-from bot.commands.economy import _to_bet
+from bot.commands.money import _to_bet
 
 
 async def check_if_dev(user_id):

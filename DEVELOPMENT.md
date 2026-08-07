@@ -18,15 +18,26 @@ birdvirus-bot/
 │       ├── admin.py         # ban, unban, view group (say, logs), clear group, property group, ec group
 │       ├── blackjack.py     # BlackjackView, draw_card, calculate_hand
 │       ├── horserace.py     # HorseRaceView with select horse and animated race
+│       ├── catrace.py       # CatRaceView with animated race
+│       ├── shop.py          # shop, inventory, back alley, take_cheat
+│       ├── update.py        # /update — snapshot, pull, syntax check, os.execv
 │       └── job.py           # job group (list, info, apply, work, quit, beg) + 6 minigame views
 ├── mp3/                     # audio files (birdvirus.mp3, bird.mp3, badapple.mp3, droid.mp3, etc.)
-├── templates/               # html templates (notable: birdvirus-cloud/)
-├── index.html               # redirects to birdvirus-cloud/
+├── site/                    # the public github pages site
+│   ├── index.html           # redirects to birdvirus-cloud/
+│   ├── privacy.html
+│   └── terms.html
+├── birdvirus-cloud/         # separate node/express service, not imported by the bot
+├── birdvirus.db             # tracked sqlite db — never published, see .github/workflows/static.yml
 ├── version.txt              # current branch and commit
 ├── .env.example             # key template
 ├── requirements.txt         # dependencies
 └── setup.sh                 # venv + dependency installer
 ```
+
+the pages workflow assembles `_site/` from `site/` plus the three static files in
+`birdvirus-cloud/`. it does not upload the repo root, because that would publish
+`birdvirus.db` and `bot/banned_users.txt`.
 
 ## conventions
 
