@@ -172,6 +172,7 @@ from .catrace import setup_catrace
 from .job import setup_job
 from .update import setup_update
 from .shop import setup_shop
+from .stocks import setup_stocks
 
 
 def setup(client: commands.Bot):
@@ -185,3 +186,4 @@ def setup(client: commands.Bot):
     setup_job(client)
     setup_update(client)
     setup_shop(client)
+    setup_stocks(client)

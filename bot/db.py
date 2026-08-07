@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import os
 import threading
@@ -157,6 +158,26 @@ def init_db():
             net INTEGER DEFAULT 0,
             insurance_claimed INTEGER DEFAULT 0,
             PRIMARY KEY (user_id, day)
+        )
+    """)
+
+    # stock market state (one row per ticker)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS stock_state (
+            ticker TEXT PRIMARY KEY,
+            price INTEGER DEFAULT 10000,
+            hist TEXT DEFAULT '[]',
+            updated_at TEXT
+        )
+    """)
+
+    # user stock holdings
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS stock_holdings (
+            user_id INTEGER,
+            ticker TEXT,
+            shares INTEGER DEFAULT 0,
+            PRIMARY KEY (user_id, ticker)
         )
     """)
 
@@ -773,6 +794,72 @@ def claim_insurance(user_id: int) -> tuple[int, int, bool]:
         conn.commit()
     cursor.close()
     return refund, eligible, False
+
+
+# Stock Market
+def get_stock_price(ticker: str) -> int:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT price FROM stock_state WHERE ticker = ?", (ticker,))
+    row = cursor.fetchone()
+    cursor.close()
+    return int(row[0]) if row else None
+
+
+def get_stock_history(ticker: str) -> list:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT hist FROM stock_state WHERE ticker = ?", (ticker,))
+    row = cursor.fetchone()
+    cursor.close()
+    if not row or not row[0]:
+        return []
+    try:
+        return json.loads(row[0])
+    except (ValueError, TypeError):
+        return []
+
+
+def set_stock_price(ticker: str, price: int, hist: list, updated_at: str):
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT OR REPLACE INTO stock_state (ticker, price, hist, updated_at) VALUES (?, ?, ?, ?)",
+        (ticker, int(price), json.dumps(hist), updated_at),
+    )
+    conn.commit()
+    cursor.close()
+
+
+def get_all_stock_prices() -> dict:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT ticker, price FROM stock_state")
+    rows = cursor.fetchall()
+    cursor.close()
+    return {ticker: int(price) for ticker, price in rows}
+
+
+def get_stock_holdings(user_id: int) -> dict:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT ticker, shares FROM stock_holdings WHERE user_id = ?", (user_id,)
+    )
+    rows = cursor.fetchall()
+    cursor.close()
+    return {ticker: int(shares) for ticker, shares in rows}
+
+
+def set_stock_shares(user_id: int, ticker: str, shares: int):
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT OR REPLACE INTO stock_holdings (user_id, ticker, shares) VALUES (?, ?, ?)",
+        (user_id, ticker, int(shares)),
+    )
+    conn.commit()
+    cursor.close()
 
 
 init_db()
