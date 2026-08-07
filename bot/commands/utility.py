@@ -53,7 +53,7 @@ def setup_utility(client: commands.Bot):
             ping_endpoint('duckduckgo', 'https://duckduckgo.com/'),
         )
 
-        uptime_delta = datetime.datetime.now(datetime.timezone.utc) - client.start_time
+        uptime_delta = datetime.datetime.now(datetime.timezone.utc) - getattr(client, "start_time", discord.utils.utcnow())
         total_seconds = int(uptime_delta.total_seconds())
         days, remainder = divmod(total_seconds, 86400)
         hours, remainder = divmod(remainder, 3600)
