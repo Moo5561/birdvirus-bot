@@ -19,6 +19,10 @@ STOCKS = [
     {"ticker": "DROID", "name": "DroidSound Co", "emoji": "🤖", "base": 15000, "vol": 0.15, "color": "#ffaa00"},
     {"ticker": "PECK", "name": "PeckCoin Mining", "emoji": "⛏️", "base": 5000, "vol": 0.20, "color": "#ff4444"},
     {"ticker": "FEED", "name": "Seed & Feed", "emoji": "🌻", "base": 8000, "vol": 0.06, "color": "#aa66ff"},
+    {"ticker": "SCRAM", "name": "Scramble Jet Fuels", "emoji": "✈️", "base": 18000, "vol": 0.10, "color": "#ff5577"},
+    {"ticker": "NEST", "name": "NestEgg Realty", "emoji": "🥚", "base": 30000, "vol": 0.06, "color": "#ffdd66"},
+    {"ticker": "SCAM", "name": "Totally Legit Coin", "emoji": "🐍", "base": 2500, "vol": 0.25, "color": "#cc44ff"},
+    {"ticker": "PLUG", "name": "Plugs & Feathers", "emoji": "🪶", "base": 12000, "vol": 0.14, "color": "#77ccff"},
 ]
 
 HIST_LEN = 12
@@ -39,41 +43,62 @@ def sparkline(hist):
 
 
 def build_market_chart(all_hist):
-    """render an overlay line chart of all tickers to a BytesIO png."""
-    fig, ax = plt.subplots(figsize=(12, 7), facecolor="#1a1a1a")
-    ax.set_facecolor("#1a1a1a")
+    """render each ticker on its own subplot (y = % change) to a BytesIO png."""
+    plotted = [(t, h) for t, h in all_hist.items() if h]
+    if not plotted and all_hist:
+        plotted = [(list(all_hist.keys())[0], [])]
+    if not plotted:
+        return None
+    n = len(plotted)
 
-    for ticker, hist in all_hist.items():
-        if not hist:
-            continue
+    cols = min(3, n)
+    rows = (n + cols - 1) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(13, 3.4 * rows), facecolor="#1a1a1a")
+    flat = [axes] if n == 1 else [ax for row in axes for ax in row]
+
+    for idx, (ticker, hist) in enumerate(plotted):
+        ax = flat[idx]
+        ax.set_facecolor("#1a1a1a")
         stock = next((s for s in STOCKS if s["ticker"] == ticker), None)
-        color = stock["color"] if stock and "color" in stock else None
-        # normalize to % change from start so big/small tickers share a scale
-        if hist[0]:
+        color = stock["color"] if stock else "#ffffff"
+
+        if hist and hist[0]:
             pct = [(p / hist[0] - 1) * 100 for p in hist]
         else:
             pct = []
-        ax.plot(range(len(pct)), pct, marker="o", markersize=3,
-                label=f"{ticker}", color=color, linewidth=2)
 
-    ax.axhline(0, color="#555555", linewidth=1, linestyle="--")
-    ax.set_title("📈 birdvirus stock exchange — % change", color="white",
-                 fontsize=15, fontweight="bold", pad=16)
-    ax.set_ylabel("% since start", color="white", fontsize=11, fontweight="bold")
-    ax.tick_params(axis="x", colors="white", labelsize=9)
-    ax.tick_params(axis="y", colors="white", labelsize=9)
-    for spine in ("top", "right"):
-        ax.spines[spine].set_visible(False)
-    for spine in ("bottom", "left"):
-        ax.spines[spine].set_color("white")
-    ax.grid(axis="y", alpha=0.2, color="white", linestyle="--")
+        ax.plot(range(len(pct)), pct, marker="o", markersize=3.5, color=color,
+                linewidth=2.2, alpha=0.95)
+        if pct:
+            ax.fill_between(range(len(pct)), pct, color=color, alpha=0.10)
 
-    ax.legend(facecolor="#1a1a1a", labelcolor="white", fontsize=10,
-              ncol=len(all_hist) or 1, loc="lower left")
-    for leg in ax.get_legend().get_texts():
-        leg.set_text(leg.get_text().upper())
+        current = hist[-1] if hist else (stock["base"] if stock else 0)
+        emoji = stock["emoji"] if stock else ""
+        name = stock["name"] if stock else ticker
+        ax.set_title(f"{emoji} {ticker} · {name} · {current:,}", color="white",
+                     fontsize=10, fontweight="bold")
 
+        ax.axhline(0, color="#555555", linewidth=1, linestyle="--")
+        ax.tick_params(axis="x", colors="white", labelsize=8)
+        ax.tick_params(axis="y", colors="white", labelsize=8)
+        for spine in ("top", "right"):
+            ax.spines[spine].set_visible(False)
+        for spine in ("bottom", "left"):
+            ax.spines[spine].set_color("#666666")
+        ax.grid(axis="y", alpha=0.15, color="white", linestyle="--")
+
+        if pct:
+            lo, hi = min(pct), max(pct)
+            pad = (hi - lo) * 0.15 if hi != lo else 1
+            ax.set_ylim(lo - pad, hi + pad)
+
+    for idx in range(n, len(flat)):
+        flat[idx].axis("off")
+
+    fig.suptitle("📈 birdvirus stock exchange — % change per ticker",
+                 color="white", fontsize=15, fontweight="bold", y=1.005)
     plt.tight_layout()
+
     buf = io.BytesIO()
     plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", facecolor="#1a1a1a")
     buf.seek(0)
@@ -157,16 +182,18 @@ def setup_stocks(client: commands.Bot):
                 f"┗ `{sparkline(hist)}`"
             )
         embed.description = "\n\n".join(lines)
-
-        embed.set_image(url="attachment://stocks_chart.png")
         embed.set_footer(text="live % change chart below • /stock buy <ticker> <shares>")
 
         chart_buf = await asyncio.to_thread(build_market_chart, all_hist)
-        file = discord.File(chart_buf, filename="stocks_chart.png")
-        await ctx.reply(embed=embed, file=file)
+        if chart_buf:
+            embed.set_image(url="attachment://stocks_chart.png")
+            file = discord.File(chart_buf, filename="stocks_chart.png")
+            await ctx.reply(embed=embed, file=file)
+        else:
+            await ctx.reply(embed=embed)
 
     @stock_group.command(name="buy", description="buy shares of a stock")
-    @app_commands.describe(ticker="which stock to buy (BIRD, VAC, DROID, PECK, FEED)", shares="how many shares")
+    @app_commands.describe(ticker="which stock to buy (BIRD, VAC, DROID, PECK, FEED, SCRAM, NEST, SCAM, PLUG)", shares="how many shares")
     async def stock_buy(ctx: commands.Context, ticker: str, shares: int):
         ticker = ticker.strip().upper()
         stock = next((s for s in STOCKS if s["ticker"] == ticker), None)
