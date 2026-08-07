@@ -4,7 +4,7 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
-from bot.commands import is_admin, is_nightly, game_lock, game_unlock, _s, claim_streak_bonus, track_gamble
+from bot.commands import is_admin, is_nightly, game_lock, game_unlock, _s, claim_streak_bonus, track_gamble, is_dev
 from bot.commands.blackjack import BlackjackView, draw_card
 from bot.commands.horserace import HorseRaceView
 from bot.commands.catrace import CatRaceView
@@ -854,9 +854,35 @@ def setup_economy(client: commands.Bot):
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         tax_collected = await asyncio.to_thread(db.get_config, "tax_collected", "0")
         status = "📈 the house is up" if house >= 0 else "📉 the house is in the hole"
+        devs = await asyncio.to_thread(db.get_config, "house_devs", "the devs")
         await ctx.reply(f"🏦 **house wallet:** {house} {coin_emoji} ({status})\n"
+                        f"👑 **house owners:** {devs}\n"
                         f"💰 lifetime tax collected: {int(tax_collected)} {coin_emoji}\n"
                         f"_gambling losses flow in, wins + streaks + insurance flow out_")
+
+    @pure_houseclaim_command := pure_group.command(name="houseclaim", description="dev-only: claim the house wallet earnings")
+    @is_dev()
+    async def pure_houseclaim(ctx: commands.Context, amount: str = None):
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        house = await asyncio.to_thread(db.get_house)
+        if house <= 0:
+            await ctx.reply("nothing to claim, the house is broke or in the hole right now 😔")
+            return
+        if amount and amount.lower() == "all":
+            claim = house
+        elif amount:
+            try:
+                claim = min(int(amount), house)
+            except ValueError:
+                await ctx.reply("amount must be a number or 'all'")
+                return
+        else:
+            claim = house
+        if claim <= 0:
+            return
+        await asyncio.to_thread(db.update_house, -claim)
+        new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, claim)
+        await ctx.reply(f"🏦 claimed {claim} {coin_emoji} from the house. your balance: {new_balance} {coin_emoji}")
 
     @client.hybrid_command(name="leaderboard", description="view the richest players")
     @app_commands.describe(page="page number to view")

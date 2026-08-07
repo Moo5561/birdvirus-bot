@@ -76,6 +76,22 @@ async def _is_configured_admin(user_id: int) -> bool:
     return False
 
 
+def is_dev():
+    async def predicate(ctx: commands.Context):
+        AUTHORIZED_USERS = [
+            1048423590623727686,
+            1278489064210956378,
+            1421940246492352612,
+            1246945967102623755,
+            1488967988207157308,
+            274556515061465088,
+            983544114635235430,
+        ]
+        return ctx.author.id in AUTHORIZED_USERS
+
+    return commands.check(predicate)
+
+
 def is_admin():
     async def predicate(ctx: commands.Context):
         if await _is_configured_admin(ctx.author.id):
