@@ -853,11 +853,13 @@ def setup_economy(client: commands.Bot):
         house = await asyncio.to_thread(db.get_house)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         tax_collected = await asyncio.to_thread(db.get_config, "tax_collected", "0")
+        rake_pct = await asyncio.to_thread(db.get_config, "house_rake", "5")
         status = "📈 the house is up" if house >= 0 else "📉 the house is in the hole"
         devs = await asyncio.to_thread(db.get_config, "house_devs", "the devs")
-        await ctx.reply(f"🏦 **house wallet:** {house} {coin_emoji} ({status})\n"
+        await ctx.reply(f"🏦 **house wallet:** {_s(house)} {coin_emoji} ({status})\n"
                         f"👑 **house owners:** {devs}\n"
-                        f"💰 lifetime tax collected: {int(tax_collected)} {coin_emoji}\n"
+                        f"🪒 **house rake:** {rake_pct}% on all wins\n"
+                        f"💰 lifetime tax collected: {_s(int(tax_collected))} {coin_emoji}\n"
                         f"_gambling losses flow in, wins + streaks + insurance flow out_")
 
     @pure_houseclaim_command := pure_group.command(name="houseclaim", description="dev-only: claim the house wallet earnings")
