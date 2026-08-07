@@ -4,7 +4,8 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
-from bot.commands.shop import ACTIVE_CHEATS
+from bot.commands import is_nightly
+from bot.commands.shop import take_cheat
 from datetime import datetime, timedelta
 from typing import Literal
 
@@ -148,8 +149,8 @@ async def handle_job_reward(ctx, job_name, job_data, success, game_message, cust
 
     xp_gain = random.randint(15, 30)
 
-    cheat = ACTIVE_CHEATS.pop(ctx.author.id, None)
-    if cheat and cheat.get("type") == "xp_boost":
+    cheat = take_cheat(ctx.author.id, "xp_boost")
+    if cheat:
         xp_gain *= cheat["value"]
     
     # Handle random event
@@ -646,7 +647,7 @@ def setup_job(client: commands.Bot):
         
         if fee > 0:
             bal = await asyncio.to_thread(db.get_balance, ctx.author.id)
-            if bal < fee and ctx.bot.user.id != 1522117141090799697:
+            if bal < fee and not is_nightly(ctx.bot):
                 await ctx.reply(f"you need {fee} coins to get the license for this job. you only have {bal}.")
                 return
             await asyncio.to_thread(db.update_balance, ctx.author.id, -fee)
@@ -716,7 +717,11 @@ def setup_job(client: commands.Bot):
         else:
             await ctx.reply("job minigame not implemented yet.")
             return
-            
+
+        # stamp the cooldown now, not when the shift resolves — otherwise you can
+        # open as many shifts at once as you can click and get paid for all of them
+        await asyncio.to_thread(db.update_job_time, ctx.author.id, datetime.utcnow().isoformat())
+
         view.message = await ctx.reply(embed=embed, view=view)
 
     @job_group.command(name="beg", description="beg your boss to let you off break early")
@@ -728,8 +733,12 @@ def setup_job(client: commands.Bot):
             return
             
         job_name = job_data["job_name"]
+        if job_name not in JOBS:
+            await ctx.reply("your job is invalid. please apply for a new one.")
+            return
+
         info = JOBS[job_name]
-        
+
         if not job_data["last_work_time"]:
             await ctx.reply("you aren't even on break... get back to work! `/job work`")
             return

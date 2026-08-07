@@ -4,29 +4,14 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
+import bot.bans as bans
 import os
-from bot.commands import is_admin, is_bot_dev, _s
+from bot.commands import is_admin, is_bot_dev, _is_configured_admin, _s
 from bot.commands.economy import _to_bet
 
+
 async def check_if_dev(user_id):
-    AUTHORIZED_USERS = [
-        1048423590623727686, 1278489064210956378, 1421940246492352612, 
-        1246945967102623755, 1488967988207157308, 274556515061465088, 
-        983544114635235430
-    ]
-    if user_id in AUTHORIZED_USERS:
-        return True
-        
-    admin_ids_str = await asyncio.to_thread(db.get_config, "admin_ids")
-    if admin_ids_str:
-        try:
-            admin_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip()]
-            if user_id in admin_ids:
-                return True
-        except Exception:
-            pass
-            
-    return False
+    return await _is_configured_admin(user_id)
 
 def setup_admin(client: commands.Bot):
     # Ban Commands
@@ -38,18 +23,16 @@ def setup_admin(client: commands.Bot):
             await ctx.reply("you cannot ban another bot developer.", ephemeral=True)
             return
             
-        import bot.events
         await asyncio.to_thread(db.ban_user, user.id)
-        bot.events.BANNED_USERS.add(user.id)
+        await bans.add_ban(user.id)
         await ctx.reply(f"{user.mention} has been banned from using the bot.")
 
     @client.hybrid_command(name="unban", description="unban a user from using the bot (bot devs only)")
     @is_bot_dev()
     @app_commands.describe(user="the user to unban")
     async def unban_cmd(ctx: commands.Context, user: discord.Member):
-        import bot.events
         await asyncio.to_thread(db.unban_user, user.id)
-        bot.events.BANNED_USERS.discard(user.id)
+        await bans.remove_ban(user.id)
         await ctx.reply(f"{user.mention} has been unbanned from using the bot.")
 
     # View Group
@@ -133,12 +116,15 @@ def setup_admin(client: commands.Bot):
 
     @property_buy_command := property_group.command(name="buy", description="buy a private property (costs 50 coins)")
     async def property_buy(ctx: commands.Context, name: str = None, type: str = "thread"):
+        if ctx.guild is None:
+            await ctx.reply("you can only buy property in a server")
+            return
+
         # this is just a quick fix since hybrid commands are tricky with custom arguments
         # especially with spaces in names.
-        
-        args = ctx.message.content.split()
-        # manual parsing if prefix command
-        if not ctx.interaction:
+
+        # manual parsing if prefix command (ctx.message is None for slash invocations)
+        if not ctx.interaction and ctx.message:
             # simple parser for --name "..." --type ...
             # this is hacky but we are in a hurry
             import argparse

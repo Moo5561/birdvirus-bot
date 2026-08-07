@@ -4,11 +4,11 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
-from bot.commands import is_admin, game_lock, game_unlock, _s
+from bot.commands import is_admin, is_nightly, game_lock, game_unlock, _s
 from bot.commands.blackjack import BlackjackView, draw_card
 from bot.commands.horserace import HorseRaceView
 from bot.commands.catrace import CatRaceView
-from bot.commands.shop import ACTIVE_CHEATS
+from bot.commands.shop import take_cheat
 
 
 def _payout(bet, mult):
@@ -30,7 +30,7 @@ def _to_bet(val):
     return v
 
 async def get_balance_checked(ctx, user_id):
-    if ctx.bot.user and ctx.bot.user.id == 1522117141090799697:
+    if is_nightly(ctx.bot):
         return 999999999999999999999999999, 999999999999999999999999999, 0
     bal, bank, debt = await asyncio.to_thread(db.get_balances, user_id)
     return bal, bank, debt
@@ -42,7 +42,7 @@ async def apply_tax(ctx, user_id, net_gain):
     tax_rate = int(tax_rate_str)
     if tax_rate <= 0:
         return 0
-    if ctx.bot.user and ctx.bot.user.id == 1522117141090799697:
+    if is_nightly(ctx.bot):
         return 0
     tax_amount = max(1, int(net_gain * tax_rate / 100))
     await asyncio.to_thread(db.update_balance, user_id, -tax_amount)
@@ -250,7 +250,7 @@ def setup_economy(client: commands.Bot):
         bet = _to_bet(bet)
             
         bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
-        if bal < bet and ctx.bot.user.id != 1522117141090799697:
+        if bal < bet and not is_nightly(ctx.bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
             
@@ -310,7 +310,7 @@ def setup_economy(client: commands.Bot):
         bet = _to_bet(bet)
             
         bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
-        if bal < bet and ctx.bot.user.id != 1522117141090799697:
+        if bal < bet and not is_nightly(ctx.bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
             
@@ -335,8 +335,8 @@ def setup_economy(client: commands.Bot):
         
         reels = [random.choice(emojis) for _ in range(3)]
 
-        cheat = ACTIVE_CHEATS.pop(ctx.author.id, None)
-        if cheat and cheat.get("type") == "slot_cheat":
+        cheat = take_cheat(ctx.author.id, "slot_cheat")
+        if cheat:
             match = random.choice(emojis)
             reels = [match, match, match]
         unique_count = len(set(reels))
@@ -400,7 +400,7 @@ def setup_economy(client: commands.Bot):
         bet = _to_bet(bet)
             
         bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
-        if bal < bet and ctx.bot.user.id != 1522117141090799697:
+        if bal < bet and not is_nightly(ctx.bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
             
@@ -513,7 +513,7 @@ def setup_economy(client: commands.Bot):
         bet = _to_bet(bet)
             
         bal, bank, _ = await get_balance_checked(ctx, ctx.author.id)
-        if bal < bet and ctx.bot.user.id != 1522117141090799697:
+        if bal < bet and not is_nightly(ctx.bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
             
@@ -521,8 +521,8 @@ def setup_economy(client: commands.Bot):
         
         roll = random.randint(1, 20)
 
-        cheat = ACTIVE_CHEATS.pop(ctx.author.id, None)
-        if cheat and cheat.get("type") == "rigged_dice":
+        cheat = take_cheat(ctx.author.id, "rigged_dice")
+        if cheat:
             roll = 20
         
         if roll == 1:
@@ -577,7 +577,7 @@ def setup_economy(client: commands.Bot):
         bet = _to_bet(bet)
 
         bal_val, _, _ = await get_balance_checked(ctx, ctx.author.id)
-        if bal_val < bet and ctx.bot.user.id != 1522117141090799697:
+        if bal_val < bet and not is_nightly(ctx.bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal_val})")
             return
 
@@ -625,7 +625,7 @@ def setup_economy(client: commands.Bot):
         bet = _to_bet(bet)
 
         bal_val, _, _ = await get_balance_checked(ctx, ctx.author.id)
-        if bal_val < bet and ctx.bot.user.id != 1522117141090799697:
+        if bal_val < bet and not is_nightly(ctx.bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal_val})")
             return
 
@@ -701,7 +701,7 @@ def setup_economy(client: commands.Bot):
         bet = _to_bet(bet)
 
         bal_val, _, _ = await get_balance_checked(ctx, ctx.author.id)
-        if bal_val < bet and ctx.bot.user.id != 1522117141090799697:
+        if bal_val < bet and not is_nightly(ctx.bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal_val})")
             return
 
@@ -778,14 +778,14 @@ def setup_economy(client: commands.Bot):
         bet = _to_bet(bet)
 
         bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
-        if bal < bet and ctx.bot.user.id != 1522117141090799697:
+        if bal < bet and not is_nightly(ctx.bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
 
         game_lock(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        cheat = ACTIVE_CHEATS.pop(ctx.author.id, None)
-        boost = cheat["value"] if (cheat and cheat.get("type") == "race_boost") else 0
+        cheat = take_cheat(ctx.author.id, "race_boost")
+        boost = cheat["value"] if cheat else 0
         view = HorseRaceView(ctx, bet, coin_emoji, game_unlock, cheat_boost=boost)
         await view.start(ctx)
 
@@ -796,14 +796,14 @@ def setup_economy(client: commands.Bot):
         bet = _to_bet(bet)
 
         bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
-        if bal < bet and ctx.bot.user.id != 1522117141090799697:
+        if bal < bet and not is_nightly(ctx.bot):
             await ctx.reply(f"you don't have enough coins to bet {bet} (balance: {bal})")
             return
 
         game_lock(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        cheat = ACTIVE_CHEATS.pop(ctx.author.id, None)
-        boost = cheat["value"] if (cheat and cheat.get("type") == "race_boost") else 0
+        cheat = take_cheat(ctx.author.id, "race_boost")
+        boost = cheat["value"] if cheat else 0
         view = CatRaceView(ctx, bet, coin_emoji, game_unlock, cheat_boost=boost)
         await view.start(ctx)
 
@@ -883,8 +883,8 @@ def setup_economy(client: commands.Bot):
         weights = [f["weight"] for f in fish_types]
         caught = random.choices(fish_types, weights=weights, k=1)[0]
 
-        cheat = ACTIVE_CHEATS.pop(ctx.author.id, None)
-        fish_mult = cheat["value"] if (cheat and cheat.get("type") == "fish_boost") else 1
+        cheat = take_cheat(ctx.author.id, "fish_boost")
+        fish_mult = cheat["value"] if cheat else 1
         
         if caught["max"] > 0:
             amount = random.randint(caught["min"], caught["max"]) * fish_mult
@@ -909,7 +909,7 @@ def setup_economy(client: commands.Bot):
             return
             
         bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
-        if bal < amount and ctx.bot.user.id != 1522117141090799697:
+        if bal < amount and not is_nightly(ctx.bot):
             await ctx.reply(f"you don't have enough coins in your holding (holding: {bal})")
             return
             
@@ -927,7 +927,7 @@ def setup_economy(client: commands.Bot):
             return
             
         _, bank, _ = await get_balance_checked(ctx, ctx.author.id)
-        if bank < amount and ctx.bot.user.id != 1522117141090799697:
+        if bank < amount and not is_nightly(ctx.bot):
             await ctx.reply(f"you don't have enough coins in your bank (bank: {bank})")
             return
             

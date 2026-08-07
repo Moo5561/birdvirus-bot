@@ -5,6 +5,7 @@ import random
 import sys
 import asyncio
 import os
+import shlex
 import time
 import io
 import discord
@@ -317,16 +318,29 @@ def setup_utility(client: commands.Bot):
             ALLOWED_BINS = ["ffmpeg", "ffprobe", "yt-dlp"]
 
             async def handle_execute(code: str) -> str:
-                cmd = code.strip().split()[0] if code.strip() else ""
-                if cmd not in ALLOWED_BINS:
-                    return f"blocked: `{cmd}` is not allowed. only ffmpeg, ffprobe, yt-dlp, mkdir, touch"
+                # never hand this to a shell — the model (or whoever is steering it)
+                # would be able to chain arbitrary commands off an allowed binary
                 try:
-                    process = await asyncio.create_subprocess_shell(
-                        code,
+                    argv = shlex.split(code)
+                except ValueError as e:
+                    return f"blocked: could not parse that command ({e})"
+                if not argv:
+                    return "blocked: empty command"
+                if argv[0] not in ALLOWED_BINS:
+                    return f"blocked: `{argv[0]}` is not allowed. only {', '.join(ALLOWED_BINS)}"
+                try:
+                    process = await asyncio.create_subprocess_exec(
+                        *argv,
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.PIPE,
                     )
-                    stdout, stderr = await process.communicate()
+                    try:
+                        stdout, stderr = await asyncio.wait_for(
+                            process.communicate(), timeout=60
+                        )
+                    except asyncio.TimeoutError:
+                        process.kill()
+                        return "error: command timed out after 60s"
                     out = ""
                     if stdout:
                         out += stdout.decode(errors="replace")
@@ -575,15 +589,15 @@ def setup_utility(client: commands.Bot):
         if success:
             gain = 25
             new_balance = await asyncio.to_thread(
-                db.update_balance, ctx.author.id, gain
+                db.update_balance, ctx.author.id, gain - cost
             )
             await ctx.reply(
-                f"you digested the bomb successfully! it was extremely nutritious. gained {gain} {coin_emoji} (balance: {new_balance})"
+                f"you digested the bomb successfully! it was extremely nutritious. gained {gain - cost} {coin_emoji} after paying for the bomb (balance: {new_balance})"
             )
         else:
             loss = -10
             new_balance = await asyncio.to_thread(
-                db.update_balance, ctx.author.id, loss
+                db.update_balance, ctx.author.id, loss - cost
             )
             responses = [
                 f"you ate the bomb and blew up. lost {cost} coins for the bomb and {abs(loss)} coins for medical bills (balance: {new_balance})",

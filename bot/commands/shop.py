@@ -4,7 +4,7 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
-from bot.commands import is_admin
+from bot.commands import is_admin, is_nightly
 
 SHOP_OPEN = dt_time(6, 0)
 SHOP_CLOSE = dt_time(0, 0)
@@ -13,6 +13,18 @@ ILLEGAL_END = dt_time(20, 0)
 
 ACTIVE_CHEATS = {}
 SHOP_OVERRIDE = None  # None = auto, "open" = force open, "closed" = force closed
+
+
+def take_cheat(user_id, cheat_type):
+    """consume the user's active cheat only if it matches cheat_type.
+
+    plain ACTIVE_CHEATS.pop() would burn an unrelated item — activating a lucky
+    charm and then fishing used to silently eat the charm.
+    """
+    cheat = ACTIVE_CHEATS.get(user_id)
+    if cheat and cheat.get("type") == cheat_type:
+        return ACTIVE_CHEATS.pop(user_id)
+    return None
 
 NORMAL_ITEMS = [
     {"name": "lucky charm", "emoji": "🍀", "price": 5000, "desc": "your horse/cat gets +3 each tick in the next race"},
@@ -27,6 +39,32 @@ ILLEGAL_ITEMS = [
 
 ALL_ITEMS = {item["name"]: item for item in NORMAL_ITEMS + ILLEGAL_ITEMS}
 
+# item name -> (cheat stored in ACTIVE_CHEATS, message shown on activation)
+ITEM_EFFECTS = {
+    "lucky charm": (
+        {"type": "race_boost", "value": 3},
+        "🍀 lucky charm activated! your next race pick gets +3 speed each tick!",
+    ),
+    "xp boost": (
+        {"type": "xp_boost", "value": 2},
+        "📚 xp boost activated! your next job shift gives double XP!",
+    ),
+    "fishing net": (
+        {"type": "fish_boost", "value": 3},
+        "🕸️ fishing net activated! your next catch is worth 3x!",
+    ),
+    "rigged dice": (
+        {"type": "rigged_dice"},
+        "🎲 rigged dice activated! next insaneroll is a guaranteed natural 20!",
+    ),
+    "slot cheat": (
+        {"type": "slot_cheat"},
+        "🎰 slot cheat activated! next slots spin lands 3 matching symbols!",
+    ),
+}
+
+ACTIVE_CHEAT_NAMES = {cheat["type"]: name for name, (cheat, _) in ITEM_EFFECTS.items()}
+
 
 def is_shop_open():
     if SHOP_OVERRIDE == "open":
@@ -39,15 +77,35 @@ def is_shop_open():
     return now >= SHOP_OPEN or now <= SHOP_CLOSE
 
 
-def is_illegal_open():
-    now = datetime.utcnow().time()
-    if ILLEGAL_START <= ILLEGAL_END:
-        return ILLEGAL_START <= now <= ILLEGAL_END
-    return False
+async def get_illegal_hours():
+    """back alley hours, honouring whatever /setillegal wrote to config."""
+    start, end = ILLEGAL_START.hour, ILLEGAL_END.hour
+    for key, fallback in (("illegal_start", start), ("illegal_end", end)):
+        raw = await asyncio.to_thread(db.get_config, key)
+        try:
+            hour = int(raw)
+        except (TypeError, ValueError):
+            hour = fallback
+        if not 0 <= hour <= 23:
+            hour = fallback
+        if key == "illegal_start":
+            start = hour
+        else:
+            end = hour
+    return start, end
+
+
+async def is_illegal_open():
+    start, end = await get_illegal_hours()
+    hour = datetime.utcnow().hour
+    if start <= end:
+        return start <= hour <= end
+    # window wraps past midnight
+    return hour >= start or hour <= end
 
 
 async def get_balance_safe(ctx, user_id):
-    if ctx.bot.user and ctx.bot.user.id == 1522117141090799697:
+    if is_nightly(ctx.bot):
         return 999999999999999999999999999
     return (await asyncio.to_thread(db.get_balance, user_id))
 
@@ -72,7 +130,7 @@ def setup_shop(client: commands.Bot):
             items_text += f"{i+1}. {item['emoji']} **{item['name'].title()}** — {item['price']} {coin_emoji}\n*{item['desc']}*\n\n"
         embed.add_field(name="Equipment", value=items_text or "none", inline=False)
 
-        if is_illegal_open():
+        if await is_illegal_open():
             shady_text = ""
             for i, item in enumerate(ILLEGAL_ITEMS):
                 shady_text += f"{i+1}. {item['emoji']} **{item['name'].title()}** — {item['price']} {coin_emoji}\n*{item['desc']}*\n\n"
@@ -83,7 +141,8 @@ def setup_shop(client: commands.Bot):
             )
             embed.set_footer(text="⚠️ using illegal items in gambling is cheating! ...but we don't judge")
         else:
-            embed.set_footer(text="the back alley is empty... come back between 18:00-20:00 utc")
+            start, end = await get_illegal_hours()
+            embed.set_footer(text=f"the back alley is empty... come back between {start:02d}:00-{end:02d}:00 utc")
 
         await ctx.reply(embed=embed)
 
@@ -101,14 +160,15 @@ def setup_shop(client: commands.Bot):
 
         item_data = ALL_ITEMS[item_key]
 
-        if item_data in ILLEGAL_ITEMS and not is_illegal_open():
-            await ctx.reply("that item is only available from the back alley between 18:00-20:00 utc")
+        if item_data in ILLEGAL_ITEMS and not await is_illegal_open():
+            start, end = await get_illegal_hours()
+            await ctx.reply(f"that item is only available from the back alley between {start:02d}:00-{end:02d}:00 utc")
             return
 
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
 
         bal = await get_balance_safe(ctx, ctx.author.id)
-        if bal < item_data["price"] and (not ctx.bot.user or ctx.bot.user.id != 1522117141090799697):
+        if bal < item_data["price"] and not is_nightly(ctx.bot):
             await ctx.reply(f"you need {item_data['price']} {coin_emoji} for that. you have {bal} {coin_emoji}")
             return
 
@@ -150,32 +210,27 @@ def setup_shop(client: commands.Bot):
     async def use(ctx: commands.Context, item: str):
         item_key = item.strip().lower()
 
+        effect = ITEM_EFFECTS.get(item_key)
+        if not effect:
+            await ctx.reply(f"can't use {item_key} here")
+            return
+
         has = await asyncio.to_thread(db.has_item, ctx.author.id, item_key)
         if not has:
             await ctx.reply(f"you don't have {item_key}. check `%inv`")
             return
 
-        await asyncio.to_thread(db.remove_item, ctx.author.id, item_key)
         user_id = ctx.author.id
-
-        if item_key == "lucky charm":
-            ACTIVE_CHEATS[user_id] = {"type": "race_boost", "value": 3}
-            await ctx.reply("🍀 lucky charm activated! your next race pick gets +3 speed each tick!")
-        elif item_key == "xp boost":
-            ACTIVE_CHEATS[user_id] = {"type": "xp_boost", "value": 2}
-            await ctx.reply("📚 xp boost activated! your next job shift gives double XP!")
-        elif item_key == "fishing net":
-            ACTIVE_CHEATS[user_id] = {"type": "fish_boost", "value": 3}
-            await ctx.reply("🕸️ fishing net activated! your next catch is worth 3x!")
-        elif item_key == "rigged dice":
-            ACTIVE_CHEATS[user_id] = {"type": "rigged_dice"}
-            await ctx.reply("🎲 rigged dice activated! next insaneroll is a guaranteed natural 20!")
-        elif item_key == "slot cheat":
-            ACTIVE_CHEATS[user_id] = {"type": "slot_cheat"}
-            await ctx.reply("🎰 slot cheat activated! next slots spin lands 3 matching symbols!")
-        else:
-            await ctx.reply(f"can't use {item_key} here")
+        cheat, response = effect
+        active = ACTIVE_CHEATS.get(user_id)
+        if active and active["type"] != cheat["type"]:
+            await ctx.reply(f"you already have a {ACTIVE_CHEAT_NAMES[active['type']]} active. use it first")
             return
+
+        # only burn the item once we know it will actually do something
+        await asyncio.to_thread(db.remove_item, ctx.author.id, item_key)
+        ACTIVE_CHEATS[user_id] = dict(cheat)
+        await ctx.reply(response)
 
     @use.error
     async def use_error(ctx: commands.Context, error):

@@ -28,7 +28,7 @@ Shared mutable state lives in `bot/commands/__init__.py`, not in the modules tha
 
 ### identity switching
 
-The bot decodes its own ID from the token in `main.py` before anything else. ID `1522117141090799697` is the nightly/dev bot: prefix `ht!` instead of `%`, `BOT_DB_PATH=birdvirus_nightly.db`, and it bypasses economy balance checks. Main bot is `1518310857598308433`. Anything keyed to environment should follow this ID check rather than a new flag.
+The bot decodes its own ID from the token in `main.py` before anything else. `bot/config.py:NIGHTLY_BOT_ID` is the nightly/dev bot: prefix `ht!` instead of `%`, `BOT_DB_PATH=birdvirus_nightly.db`, and it bypasses economy balance checks — test that with `is_nightly(ctx.bot)` from `bot/commands/__init__.py`, never a fresh ID literal. Main bot is `1518310857598308433`. Anything keyed to environment should follow this ID check rather than a new flag.
 
 ### database
 
@@ -42,7 +42,7 @@ The bot decodes its own ID from the token in `main.py` before anything else. ID 
 
 ### permissions
 
-`@is_admin()` and `@is_bot_dev()` in `bot/commands/__init__.py` are currently identical (hardcoded ID list → `admin_ids` config row → guild administrator perm). Treat `is_bot_dev` as the stricter one for intent even though the code doesn't yet differ.
+Both checks live in `bot/commands/__init__.py` and share `_is_configured_admin()` (owner list in `bot/config.py:OWNER_IDS` → `admin_ids` config row). `@is_admin()` additionally accepts a guild administrator; `@is_bot_dev()` does not, so host-level commands like `/update` are owners-only. `ctx.author.guild_permissions` only exists on `Member`, so any new perm check needs a `ctx.guild is not None` guard — commands are DM-enabled globally.
 
 ### messaging
 
@@ -51,6 +51,8 @@ The bot decodes its own ID from the token in `main.py` before anything else. ID 
 Bans are checked in three places (`@client.check`, `tree.interaction_check`, `on_message`) against a file list (`bot/banned_users.txt`, via `bot/bans.py`) with the `banned_users` table as fallback.
 
 ### ai / audio
+
+`/chat` exposes an `execute` tool to the model, restricted to `ffmpeg`/`ffprobe`/`yt-dlp`. It runs via `create_subprocess_exec` on a `shlex.split` argv — never reintroduce a shell there, or the allowlist becomes bypassable with `&&`.
 
 `/chat`, `/internet search`, and `/tts` in `bot/commands/utility.py` talk to Gemini through its **OpenAI-compatible endpoint** (`generativelanguage.googleapis.com/v1beta/openai/chat/completions`) with `API_KEY` as a bearer token, model `gemini-3.1-flash-lite`. TTS goes through `g4f` with an ordered provider fallback (OpenAIFM → Gemini) because OpenAIFM gets rate-limited; keep the list-of-providers loop shape when adding one.
 
@@ -61,4 +63,5 @@ Bans are checked in three places (`@client.check`, `tree.interaction_check`, `on
 - all user-facing bot text is lowercase and casual, punctuation only where it matters.
 - commands are `@client.hybrid_command` / `@client.hybrid_group` so slash and prefix both work; `default_allowed_contexts` in `main.py` already enables DMs and user installs, so guard anything that needs a guild (`ctx.guild is None`) yourself.
 - use `_s()` from `bot/commands/__init__.py` to format coin amounts (1.2k / 5.7m / scientific).
+- consume shop items with `take_cheat(user_id, type)` from `bot/commands/shop.py`, not `ACTIVE_CHEATS.pop()` — a bare pop burns whatever unrelated item the user had active.
 - `version.txt` is written by the `Update Version File` workflow on pushes to `main` — don't hand-edit it.

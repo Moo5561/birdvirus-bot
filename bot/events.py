@@ -7,6 +7,7 @@ import subprocess
 import discord.ext.commands as commands
 import bot.db as db
 import bot.bans as bans
+from bot.config import NIGHTLY_BOT_ID
 
 SNAPSHOT_FILE = "update_snapshot.txt"
 
@@ -39,7 +40,7 @@ def setup(client: commands.Bot):
             print("reverted. restarting with original args...")
             os.execv(sys.executable, [sys.executable] + sys.argv)
 
-        prefix = "ht!" if client.user and client.user.id == 1522117141090799697 else "%"
+        prefix = "ht!" if client.user and client.user.id == NIGHTLY_BOT_ID else "%"
         await client.change_presence(
             activity=discord.CustomActivity(name=f"{prefix} • hosted by {client._host}")
         )

@@ -2,6 +2,13 @@ import asyncio
 import discord
 import discord.ext.commands as commands
 import bot.db as db
+from bot.config import NIGHTLY_BOT_ID, OWNER_IDS
+
+
+def is_nightly(bot) -> bool:
+    """the nightly/dev bot bypasses economy balance checks."""
+    return bool(bot.user and bot.user.id == NIGHTLY_BOT_ID)
+
 
 audio_queues = {}
 voice_joiners = {}
@@ -52,32 +59,30 @@ commands.Context.send = safe_send
 commands.Context.reply = safe_reply
 
 
+async def _is_configured_admin(user_id: int) -> bool:
+    """owner list + the admin_ids config row. no guild perms involved."""
+    if user_id in OWNER_IDS:
+        return True
+
+    admin_ids_str = await asyncio.to_thread(db.get_config, "admin_ids")
+    if admin_ids_str:
+        try:
+            admin_ids = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip()]
+            if user_id in admin_ids:
+                return True
+        except Exception as e:
+            print(f"error parsing admin_ids config: {e}")
+
+    return False
+
+
 def is_admin():
     async def predicate(ctx: commands.Context):
-        AUTHORIZED_USERS = [
-            1048423590623727686,
-            1278489064210956378,
-            1421940246492352612,
-            1246945967102623755,
-            1488967988207157308,
-            274556515061465088,
-            983544114635235430,
-        ]
-        if ctx.author.id in AUTHORIZED_USERS:
+        if await _is_configured_admin(ctx.author.id):
             return True
 
-        admin_ids_str = await asyncio.to_thread(db.get_config, "admin_ids")
-        if admin_ids_str:
-            try:
-                admin_ids = [
-                    int(x.strip()) for x in admin_ids_str.split(",") if x.strip()
-                ]
-                if ctx.author.id in admin_ids:
-                    return True
-            except Exception as e:
-                print(f"error parsing admin_ids config: {e}")
-
-        if ctx.author.guild_permissions.administrator:
+        # guild_permissions only exists on Member — commands work in dms too
+        if ctx.guild is not None and ctx.author.guild_permissions.administrator:
             return True
 
         return False
@@ -87,33 +92,7 @@ def is_admin():
 
 def is_bot_dev():
     async def predicate(ctx: commands.Context):
-        AUTHORIZED_USERS = [
-            1048423590623727686,
-            1278489064210956378,
-            1421940246492352612,
-            1246945967102623755,
-            1488967988207157308,
-            274556515061465088,
-            983544114635235430,
-        ]
-        if ctx.author.id in AUTHORIZED_USERS:
-            return True
-
-        admin_ids_str = await asyncio.to_thread(db.get_config, "admin_ids")
-        if admin_ids_str:
-            try:
-                admin_ids = [
-                    int(x.strip()) for x in admin_ids_str.split(",") if x.strip()
-                ]
-                if ctx.author.id in admin_ids:
-                    return True
-            except Exception as e:
-                print(f"error parsing admin_ids config: {e}")
-
-        if ctx.author.guild_permissions.administrator:
-            return True
-
-        return False
+        return await _is_configured_admin(ctx.author.id)
 
     return commands.check(predicate)
 
