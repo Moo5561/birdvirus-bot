@@ -5,7 +5,6 @@ import random
 import sys
 import asyncio
 import os
-import shlex
 import time
 import io
 import discord
@@ -315,43 +314,6 @@ def setup_utility(client: commands.Bot):
                         }
                     )
 
-            ALLOWED_BINS = ["ffmpeg", "ffprobe", "yt-dlp"]
-
-            async def handle_execute(code: str) -> str:
-                # never hand this to a shell — the model (or whoever is steering it)
-                # would be able to chain arbitrary commands off an allowed binary
-                try:
-                    argv = shlex.split(code)
-                except ValueError as e:
-                    return f"blocked: could not parse that command ({e})"
-                if not argv:
-                    return "blocked: empty command"
-                if argv[0] not in ALLOWED_BINS:
-                    return f"blocked: `{argv[0]}` is not allowed. only {', '.join(ALLOWED_BINS)}"
-                try:
-                    process = await asyncio.create_subprocess_exec(
-                        *argv,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE,
-                    )
-                    try:
-                        stdout, stderr = await asyncio.wait_for(
-                            process.communicate(), timeout=60
-                        )
-                    except asyncio.TimeoutError:
-                        process.kill()
-                        return "error: command timed out after 60s"
-                    out = ""
-                    if stdout:
-                        out += stdout.decode(errors="replace")
-                    if stderr:
-                        out += stderr.decode(errors="replace")
-                    if not out:
-                        return "done (no output)"
-                    return out[:1500]
-                except Exception as e:
-                    return f"error: {e}"
-
             aipayload = {
                 "model": "gemini-3.1-flash-lite",
                 "messages": [
@@ -376,23 +338,6 @@ def setup_utility(client: commands.Bot):
                                     }
                                 },
                                 "required": ["reason"],
-                            },
-                        },
-                    },
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "execute",
-                            "description": "run ffmpeg, ffprobe, or yt-dlp on the server to process audio/video",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "code": {
-                                        "type": "string",
-                                        "description": "the command to run",
-                                    }
-                                },
-                                "required": ["code"],
                             },
                         },
                     },
@@ -428,7 +373,6 @@ def setup_utility(client: commands.Bot):
             message_data = choice["message"]
 
             if "tool_calls" in message_data and message_data["tool_calls"]:
-                executed = False
                 for tool_call in message_data["tool_calls"]:
                     fn_name = tool_call.get("function", {}).get("name")
                     if fn_name == "ignore":
@@ -436,15 +380,6 @@ def setup_utility(client: commands.Bot):
                             f"birdvirus bot chose to ignore the message. reason: {tool_call.get('function', {}).get('arguments')}"
                         )
                         return
-                    elif fn_name == "execute":
-                        import json
-                        args = json.loads(tool_call.get("function", {}).get("arguments", "{}"))
-                        code = args.get("code", "")
-                        result = await handle_execute(code)
-                        executed = True
-                        await ctx.reply(f"ran: `{code}`\n```\n{result}\n```")
-                if executed:
-                    return
         except Exception as e:
             print(f"error in chat command: {e}")
             await ctx.reply("something went wrong.")

@@ -52,7 +52,7 @@ Bans are checked in three places (`@client.check`, `tree.interaction_check`, `on
 
 ### ai / audio
 
-`/chat` exposes an `execute` tool to the model, restricted to `ffmpeg`/`ffprobe`/`yt-dlp`. It runs via `create_subprocess_exec` on a `shlex.split` argv — never reintroduce a shell there, or the allowlist becomes bypassable with `&&`.
+`/chat` gives the model exactly one tool, `ignore`. It used to have an `execute` tool that ran allowlisted binaries; that was removed because the allowlist only checked the first token while the command went to a shell, so `ffmpeg -h && <anything>` was arbitrary code execution on the host. Don't add a subprocess path back into `/chat`.
 
 `/chat`, `/internet search`, and `/tts` in `bot/commands/utility.py` talk to Gemini through its **OpenAI-compatible endpoint** (`generativelanguage.googleapis.com/v1beta/openai/chat/completions`) with `API_KEY` as a bearer token, model `gemini-3.1-flash-lite`. TTS goes through `g4f` with an ordered provider fallback (OpenAIFM → Gemini) because OpenAIFM gets rate-limited; keep the list-of-providers loop shape when adding one.
 
