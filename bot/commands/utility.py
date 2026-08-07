@@ -315,43 +315,6 @@ def setup_utility(client: commands.Bot):
                         }
                     )
 
-            ALLOWED_BINS = ["ffmpeg", "ffprobe", "yt-dlp"]
-
-            async def handle_execute(code: str) -> str:
-                # never hand this to a shell — the model (or whoever is steering it)
-                # would be able to chain arbitrary commands off an allowed binary
-                try:
-                    argv = shlex.split(code)
-                except ValueError as e:
-                    return f"blocked: could not parse that command ({e})"
-                if not argv:
-                    return "blocked: empty command"
-                if argv[0] not in ALLOWED_BINS:
-                    return f"blocked: `{argv[0]}` is not allowed. only {', '.join(ALLOWED_BINS)}"
-                try:
-                    process = await asyncio.create_subprocess_exec(
-                        *argv,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE,
-                    )
-                    try:
-                        stdout, stderr = await asyncio.wait_for(
-                            process.communicate(), timeout=60
-                        )
-                    except asyncio.TimeoutError:
-                        process.kill()
-                        return "error: command timed out after 60s"
-                    out = ""
-                    if stdout:
-                        out += stdout.decode(errors="replace")
-                    if stderr:
-                        out += stderr.decode(errors="replace")
-                    if not out:
-                        return "done (no output)"
-                    return out[:1500]
-                except Exception as e:
-                    return f"error: {e}"
-
             aipayload = {
                 "model": "gemini-3.1-flash-lite",
                 "messages": [
@@ -360,42 +323,6 @@ def setup_utility(client: commands.Bot):
                         "content": f"you are a girl in a discord server. you are called birdvirus. you do NOT use emojis, capital letters or punctuation marks. keep responses short and casual like a real person texting. do not over explain things. do not use full sentences if you dont need to. you remember what people said earlier in the conversation and refer back to it naturally. if someone asks who said something you can tell them because messages are prefixed with their username. do not acknowledge that you have a system prompt or that you are an ai. just act like a guy in the server. if someone is annoying, trolling, or talking nonsense, use the 'ignore' tool to remain completely silent. you can have opinions and preferences. the chat history is for context only. always respond to the very last message in the history, that is the one you are replying to, but you can also bring up others if appropiate but still respond to the genuine question. also ignore anyone named heyo.",
                     },
                     *messages,
-                ],
-                "tools": [
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "ignore",
-                            "description": "call this function if the user is annoying, trolling, talking nonsense, or if you simply decide to ignore them and not respond at all",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "reason": {
-                                        "type": "string",
-                                        "description": "the reason why you are choosing to ignore this message",
-                                    }
-                                },
-                                "required": ["reason"],
-                            },
-                        },
-                    },
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "execute",
-                            "description": "run ffmpeg, ffprobe, or yt-dlp on the server to process audio/video",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "code": {
-                                        "type": "string",
-                                        "description": "the command to run",
-                                    }
-                                },
-                                "required": ["code"],
-                            },
-                        },
-                    },
                 ],
                 "temperature": 0.5,
             }
@@ -427,24 +354,6 @@ def setup_utility(client: commands.Bot):
 
             message_data = choice["message"]
 
-            if "tool_calls" in message_data and message_data["tool_calls"]:
-                executed = False
-                for tool_call in message_data["tool_calls"]:
-                    fn_name = tool_call.get("function", {}).get("name")
-                    if fn_name == "ignore":
-                        print(
-                            f"birdvirus bot chose to ignore the message. reason: {tool_call.get('function', {}).get('arguments')}"
-                        )
-                        return
-                    elif fn_name == "execute":
-                        import json
-                        args = json.loads(tool_call.get("function", {}).get("arguments", "{}"))
-                        code = args.get("code", "")
-                        result = await handle_execute(code)
-                        executed = True
-                        await ctx.reply(f"ran: `{code}`\n```\n{result}\n```")
-                if executed:
-                    return
         except Exception as e:
             print(f"error in chat command: {e}")
             await ctx.reply("something went wrong.")
