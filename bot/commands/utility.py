@@ -180,7 +180,11 @@ def setup_utility(client: commands.Bot):
         embed.timestamp = discord.utils.utcnow()
 
         file = discord.File(buf, filename="latency_chart.png")
-        await msg.edit(content="", embed=embed, file=file)
+        try:
+            await msg.delete()
+        except:
+            pass
+        await ctx.reply(embed=embed, file=file)
 
     # gif
     @client.hybrid_command(name="gif", description="get a free cool gif from my gifs")
