@@ -5,7 +5,6 @@ import random
 import sys
 import asyncio
 import os
-import shlex
 import time
 import io
 import discord
@@ -368,6 +367,25 @@ def setup_utility(client: commands.Bot):
                     },
                     *messages,
                 ],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "ignore",
+                            "description": "call this function if the user is annoying, trolling, talking nonsense, or if you simply decide to ignore them and not respond at all",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "description": "the reason why you are choosing to ignore this message",
+                                    }
+                                },
+                                "required": ["reason"],
+                            },
+                        },
+                    },
+                ],
                 "temperature": 0.5,
             }
 
@@ -398,6 +416,14 @@ def setup_utility(client: commands.Bot):
 
             message_data = choice["message"]
 
+            if "tool_calls" in message_data and message_data["tool_calls"]:
+                for tool_call in message_data["tool_calls"]:
+                    fn_name = tool_call.get("function", {}).get("name")
+                    if fn_name == "ignore":
+                        print(
+                            f"birdvirus bot chose to ignore the message. reason: {tool_call.get('function', {}).get('arguments')}"
+                        )
+                        return
         except Exception as e:
             print(f"error in chat command: {e}")
             await ctx.reply("something went wrong.")

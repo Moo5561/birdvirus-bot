@@ -481,53 +481,6 @@ def update_house(change: int) -> int:
     return new_val
 
 
-# Balance Locks
-def is_balance_locked(user_id: int) -> bool:
-    csv = get_config("locked_balances", "")
-    if not csv or not csv.strip():
-        return False
-    return str(user_id) in [x.strip() for x in csv.split(",") if x.strip()]
-
-
-def lock_balance(user_id: int):
-    csv = get_config("locked_balances", "")
-    ids = [x.strip() for x in csv.split(",") if x.strip()]
-    uid = str(user_id)
-    if uid not in ids:
-        ids.append(uid)
-    set_config("locked_balances", ",".join(ids))
-
-
-def unlock_balance(user_id: int):
-    csv = get_config("locked_balances", "")
-    ids = [x.strip() for x in csv.split(",") if x.strip()]
-    uid = str(user_id)
-    if uid in ids:
-        ids.remove(uid)
-    set_config("locked_balances", ",".join(ids))
-
-
-def get_locked_balances() -> list[int]:
-    csv = get_config("locked_balances", "")
-    if not csv or not csv.strip():
-        return []
-    return [int(x.strip()) for x in csv.split(",") if x.strip()]
-    """atomically adjust the house wallet balance. returns new balance."""
-    conn = _conn()
-    cursor = conn.cursor()
-    val = str(change)
-    cursor.execute(
-        "INSERT INTO config (key, value) VALUES ('house_wallet', ?) ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + CAST(? AS INTEGER)",
-        (val, val),
-    )
-    conn.commit()
-    cursor.execute("SELECT CAST(value AS INTEGER) FROM config WHERE key = 'house_wallet'")
-    row = cursor.fetchone()
-    new_val = _safe_int(row[0]) if row and row[0] else 0
-    cursor.close()
-    return new_val
-
-
 # Properties Functions
 def add_property(thread_id: int, owner_id: int, name: str):
     conn = _conn()

@@ -32,16 +32,8 @@ def _to_bet(val):
 async def get_balance_checked(ctx, user_id):
     if is_nightly(ctx.bot):
         return 999999999999999999999999999, 999999999999999999999999999, 0
-    if await asyncio.to_thread(db.is_balance_locked, user_id):
-        raise commands.CommandError("your balance is locked. contact a dev")
     bal, bank, debt = await asyncio.to_thread(db.get_balances, user_id)
     return bal, bank, debt
-
-async def check_balance_lock(ctx):
-    if is_nightly(ctx.bot):
-        return
-    if await asyncio.to_thread(db.is_balance_locked, ctx.author.id):
-        raise commands.CommandError("your balance is locked. contact a dev")
 
 async def apply_tax(ctx, user_id, net_gain):
     if net_gain <= 0:
@@ -914,33 +906,6 @@ def setup_economy(client: commands.Bot):
         else:
             await ctx.reply(f"house: {house} {coin_emoji}\nusage: `/pure bailout <amount>` to inject, `/pure bailout wipe` to zero it")
 
-    @client.hybrid_command(name="lockbalance", description="dev-only: freeze a user's balance")
-    @app_commands.describe(user="the user to lock")
-    @is_dev()
-    async def lockbalance(ctx: commands.Context, user: discord.User):
-        await asyncio.to_thread(db.lock_balance, user.id)
-        await ctx.reply(f"🔒 locked {user.mention}'s balance. they cannot gamble, beg, fish, deposit, or withdraw")
-
-    @client.hybrid_command(name="unlockbalance", description="dev-only: unfreeze a user's balance")
-    @app_commands.describe(user="the user to unlock")
-    @is_dev()
-    async def unlockbalance(ctx: commands.Context, user: discord.User):
-        await asyncio.to_thread(db.unlock_balance, user.id)
-        await ctx.reply(f"🔓 unlocked {user.mention}'s balance")
-
-    @client.hybrid_command(name="locked", description="dev-only: list all locked balances")
-    @is_dev()
-    async def locked(ctx: commands.Context):
-        locked = await asyncio.to_thread(db.get_locked_balances)
-        if not locked:
-            await ctx.reply("no locked balances")
-            return
-        names = []
-        for uid in locked:
-            user = ctx.bot.get_user(uid)
-            names.append(f"{user.name if user else uid} ({uid})")
-        await ctx.reply(f"🔒 locked balances ({len(locked)}): {', '.join(names)}")
-
     @client.hybrid_command(name="leaderboard", description="view the richest players")
     @app_commands.describe(page="page number to view")
     async def leaderboard(ctx: commands.Context, page: int = 1):
@@ -971,7 +936,6 @@ def setup_economy(client: commands.Bot):
     @client.hybrid_command(name="beg", description="beg for some coins with low risk")
     @commands.cooldown(1, 30, commands.BucketType.user)
     async def beg(ctx: commands.Context):
-        await check_balance_lock(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         
         success = random.random() < 0.90
@@ -1006,7 +970,6 @@ def setup_economy(client: commands.Bot):
     @client.hybrid_command(name="fish", description="go fishing to catch some fish and earn coins")
     @commands.cooldown(1, 45, commands.BucketType.user)
     async def fish(ctx: commands.Context):
-        await check_balance_lock(ctx)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         
         fish_types = [
