@@ -204,8 +204,19 @@ def setup_voice(client: commands.Bot):
             return
 
         try:
-            queue_audio(ctx.voice_client, "droid_sound.mp3")
-            await ctx.reply("queued: `droid`")
+            audio_file = next(
+                (
+                    s
+                    for s in ("mp3/droid_sound.mp3", "mp3/droid.mp3", "mp3/bird.mp3")
+                    if os.path.exists(s)
+                ),
+                None,
+            )
+            if audio_file is None:
+                await ctx.reply("no droid audio file found on disk, sad")
+                return
+            queue_audio(ctx.voice_client, audio_file)
+            await ctx.reply("queued: `droid`", ephemeral=True)
         except Exception as e:
             await ctx.reply(f"error queueing audio: {e}")
 
