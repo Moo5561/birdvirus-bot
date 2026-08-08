@@ -46,7 +46,9 @@ Test for it with `is_nightly(ctx.bot)` from `bot/commands/__init__.py`. Anything
 
 ### database
 
-`bot/db.py` is plain synchronous `sqlite3`, opening a connection per call, path from `BOT_DB_PATH` (default `birdvirus.db`). Every call from command code must be wrapped in `await asyncio.to_thread(...)` or it blocks the event loop.
+`bot/db.py` is plain synchronous `sqlite3`, path from `BOT_DB_PATH` (default `birdvirus.db`). Connections are thread-local and persistent (`_conn()`), running in WAL with `synchronous=NORMAL`, so each executor thread reuses one connection rather than reopening per call. Every call from command code must still be wrapped in `await asyncio.to_thread(...)` or it blocks the event loop.
+
+`get_config()` reads are cached process-wide. Any new writer to the `config` table must go through `set_config()` or call `_invalidate_config(key)` — `update_house()` does the latter because it writes `house_wallet` with raw SQL.
 
 New tables go in `init_db()` as `CREATE TABLE IF NOT EXISTS`. **There are no migrations**, so a new column on an existing table needs defensive `ALTER TABLE` / default handling — production databases already exist and will not be recreated.
 

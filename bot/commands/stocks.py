@@ -209,13 +209,16 @@ def setup_stocks(client: commands.Bot):
             color=0x2f3136,
         )
 
+        state = await asyncio.to_thread(db.get_all_stock_state)
+
         lines = []
         all_hist = {}
         for s in STOCKS:
-            price = await asyncio.to_thread(db.get_stock_price, s["ticker"])
+            entry = state.get(s["ticker"]) or {}
+            price = entry.get("price")
             if price is None:
                 price = s["base"]
-            hist = await asyncio.to_thread(db.get_stock_history, s["ticker"]) or []
+            hist = entry.get("hist") or []
             all_hist[s["ticker"]] = hist
             change = ""
             if len(hist) >= 2:

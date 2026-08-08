@@ -445,13 +445,32 @@ def get_all_debts() -> list[dict]:
 
 
 # Config Functions (Emoji, Properties channel, etc)
+#
+# config rows are read constantly (coin_emoji alone is read on nearly every
+# command) and written almost never, so reads are cached process-wide. dict
+# get/set are atomic under the GIL, so no lock is needed across executor
+# threads. every writer must invalidate — see _invalidate_config.
+_config_cache = {}
+_MISSING = object()  # distinguishes "not cached" from "cached as absent"
+
+
+def _invalidate_config(key: str):
+    _config_cache.pop(key, None)
+
+
 def get_config(key: str, default: str = None) -> str:
+    cached = _config_cache.get(key, _MISSING)
+    if cached is not _MISSING:
+        return cached if cached is not None else default
+
     conn = _conn()
     cursor = conn.cursor()
     cursor.execute("SELECT value FROM config WHERE key = ?", (key,))
     row = cursor.fetchone()
     cursor.close()
-    return row[0] if row else default
+    value = row[0] if row else None
+    _config_cache[key] = value
+    return value if value is not None else default
 
 
 def set_config(key: str, value: str):
@@ -463,6 +482,7 @@ def set_config(key: str, value: str):
     )
     conn.commit()
     cursor.close()
+    _config_cache[key] = value
 
 
 # House Wallet
@@ -495,6 +515,9 @@ def update_house(change: int) -> int:
         (val, val),
     )
     conn.commit()
+    # written by raw sql, not set_config — keep the cache honest in case
+    # anything ever reads house_wallet through get_config()
+    _invalidate_config("house_wallet")
     cursor.execute("SELECT CAST(value AS INTEGER) FROM config WHERE key = 'house_wallet'")
     row = cursor.fetchone()
     new_val = _safe_int(row[0]) if row and row[0] else 0
@@ -818,6 +841,29 @@ def get_stock_history(ticker: str) -> list:
         return json.loads(row[0])
     except (ValueError, TypeError):
         return []
+
+
+def get_all_stock_state() -> dict:
+    """price + history for every ticker in one query.
+
+    /stock market used to call get_stock_price and get_stock_history per
+    ticker, which is 2 round-trips through the executor per stock. this is
+    one.
+    """
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT ticker, price, hist FROM stock_state")
+    rows = cursor.fetchall()
+    cursor.close()
+
+    state = {}
+    for ticker, price, hist in rows:
+        try:
+            parsed = json.loads(hist) if hist else []
+        except (ValueError, TypeError):
+            parsed = []
+        state[ticker] = {"price": int(price) if price is not None else None, "hist": parsed}
+    return state
 
 
 def set_stock_price(ticker: str, price: int, hist: list, updated_at: str):
