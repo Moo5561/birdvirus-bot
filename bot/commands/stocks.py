@@ -145,6 +145,18 @@ def drift_ticker(ticker, force_trend=None):
     record_price(ticker, price)
 
 
+def drift_synthetic_tickers():
+    """drift every non-real ticker. runs in one executor thread on one
+    connection, rather than a to_thread hop per ticker."""
+    for s in STOCKS:
+        if s.get("real"):
+            continue
+        try:
+            drift_ticker(s["ticker"])
+        except Exception as e:
+            print(f"error updating {s['ticker']}: {e}")
+
+
 async def fetch_real_price(symbol):
     """grab the current market price from yahoo finance."""
     headers = {
@@ -171,18 +183,26 @@ async def fetch_real_price(symbol):
 def setup_stocks(client: commands.Bot):
     @tasks.loop(seconds=12.0)
     async def market_loop():
+        # synthetic tickers are pure local computation, so drift them all in
+        # one executor hop instead of one per ticker every 12 seconds.
+        try:
+            await asyncio.to_thread(drift_synthetic_tickers)
+        except Exception as e:
+            print(f"error drifting synthetic tickers: {e}")
+
+        # real tickers each need their own network call, so they stay
+        # sequential and keep their independent fetch cooldown.
         for s in STOCKS:
+            if not s.get("real"):
+                continue
             try:
-                if s.get("real"):
-                    now = time.time()
-                    last = _real_last_fetch.get(s["ticker"], 0)
-                    if now - last < REAL_FETCH_COOLDOWN:
-                        continue
-                    price = await fetch_real_price(s["symbol"])
-                    _real_last_fetch[s["ticker"]] = now
-                    await asyncio.to_thread(record_price, s["ticker"], price)
-                else:
-                    await asyncio.to_thread(drift_ticker, s["ticker"])
+                now = time.time()
+                last = _real_last_fetch.get(s["ticker"], 0)
+                if now - last < REAL_FETCH_COOLDOWN:
+                    continue
+                price = await fetch_real_price(s["symbol"])
+                _real_last_fetch[s["ticker"]] = now
+                await asyncio.to_thread(record_price, s["ticker"], price)
             except Exception as e:
                 print(f"error updating {s['ticker']}: {e}")
 
@@ -256,6 +276,8 @@ def setup_stocks(client: commands.Bot):
 
         await asyncio.to_thread(ensure_stock, ticker)
         price = await asyncio.to_thread(db.get_stock_price, ticker)
+        if price is None:
+            price = stock["base"]
         cost = price * shares
 
         bal, _, _ = await asyncio.to_thread(db.get_balances, ctx.author.id)
@@ -265,16 +287,13 @@ def setup_stocks(client: commands.Bot):
 
         game_lock(ctx)
         try:
-            await asyncio.to_thread(db.update_balance, ctx.author.id, -cost)
-            await asyncio.to_thread(db.update_house, cost)
-            holdings = await asyncio.to_thread(db.get_stock_holdings, ctx.author.id)
-            holdings[ticker] = holdings.get(ticker, 0) + shares
-            await asyncio.to_thread(db.set_stock_shares, ctx.author.id, ticker, holdings[ticker])
+            new_balance, held = await asyncio.to_thread(
+                db.apply_stock_trade, ctx.author.id, ticker, shares, -cost
+            )
             coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-            new_balance = await asyncio.to_thread(db.get_balance, ctx.author.id)
             await ctx.reply(
                 f"📈 bought {shares} share(s) of {stock['emoji']} **{ticker}** @ {coin_emoji} {_s(price)} each "
-                f"({_s(cost)} total). now holding {holdings[ticker]} shares. balance: {_s(new_balance)} {coin_emoji}"
+                f"({_s(cost)} total). now holding {held} shares. balance: {_s(new_balance)} {coin_emoji}"
             )
         finally:
             game_unlock(ctx)
@@ -306,19 +325,13 @@ def setup_stocks(client: commands.Bot):
 
         game_lock(ctx)
         try:
-            await asyncio.to_thread(db.update_balance, ctx.author.id, proceeds)
-            await asyncio.to_thread(db.update_house, -proceeds)
-            holdings[ticker] = held - shares
-            if holdings[ticker] <= 0:
-                del holdings[ticker]
-                await asyncio.to_thread(db.set_stock_shares, ctx.author.id, ticker, 0)
-            else:
-                await asyncio.to_thread(db.set_stock_shares, ctx.author.id, ticker, holdings[ticker])
+            new_balance, remaining = await asyncio.to_thread(
+                db.apply_stock_trade, ctx.author.id, ticker, -shares, proceeds
+            )
             coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-            new_balance = await asyncio.to_thread(db.get_balance, ctx.author.id)
             await ctx.reply(
                 f"📉 sold {shares} share(s) of {stock['emoji']} **{ticker}** @ {coin_emoji} {_s(price)} each "
-                f"({_s(proceeds)} total). remaining: {holdings.get(ticker, 0)} shares. balance: {_s(new_balance)} {coin_emoji}"
+                f"({_s(proceeds)} total). remaining: {remaining} shares. balance: {_s(new_balance)} {coin_emoji}"
             )
         finally:
             game_unlock(ctx)
@@ -331,6 +344,7 @@ def setup_stocks(client: commands.Bot):
             return
 
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        state = await asyncio.to_thread(db.get_all_stock_state)
         embed = discord.Embed(
             title=f"💼 {ctx.author.display_name}'s portfolio",
             color=0x2f3136,
@@ -343,7 +357,7 @@ def setup_stocks(client: commands.Bot):
             stock = next((s for s in STOCKS if s["ticker"] == ticker), None)
             if stock is None:
                 continue
-            price = await asyncio.to_thread(db.get_stock_price, ticker)
+            price = (state.get(ticker) or {}).get("price") or stock["base"]
             value = price * shares
             total += value
             lines.append(

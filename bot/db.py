@@ -866,6 +866,69 @@ def get_all_stock_state() -> dict:
     return state
 
 
+def apply_stock_trade(user_id: int, ticker: str, share_delta: int, coin_delta: int) -> tuple[int, int]:
+    """settle a stock trade in one transaction. returns (new_balance, new_shares).
+
+    the user's coin change and the house's are always equal and opposite:
+    coins leaving the player go to the house and vice versa. previously the
+    caller made these as separate committed writes, so a crash in between
+    left the house books disagreeing with the player's balance.
+
+    mirrors update_balance()'s behaviour for a user with no economy row yet
+    (they start at 100 coins).
+    """
+    conn = _conn()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT balance FROM economy WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row is None:
+            new_balance = 100 + coin_delta
+            cursor.execute(
+                "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, ?, '0', '0')",
+                (user_id, str(new_balance)),
+            )
+        else:
+            new_balance = _safe_int(row[0]) + coin_delta
+            cursor.execute(
+                "UPDATE economy SET balance = ? WHERE user_id = ?", (str(new_balance), user_id)
+            )
+
+        house_delta = str(-coin_delta)
+        cursor.execute(
+            "INSERT INTO config (key, value) VALUES ('house_wallet', ?) ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + CAST(? AS INTEGER)",
+            (house_delta, house_delta),
+        )
+
+        cursor.execute(
+            "SELECT shares FROM stock_holdings WHERE user_id = ? AND ticker = ?",
+            (user_id, ticker),
+        )
+        held_row = cursor.fetchone()
+        new_shares = (int(held_row[0]) if held_row else 0) + share_delta
+        if new_shares <= 0:
+            new_shares = 0
+            cursor.execute(
+                "DELETE FROM stock_holdings WHERE user_id = ? AND ticker = ?",
+                (user_id, ticker),
+            )
+        else:
+            cursor.execute(
+                "INSERT OR REPLACE INTO stock_holdings (user_id, ticker, shares) VALUES (?, ?, ?)",
+                (user_id, ticker, new_shares),
+            )
+
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+
+    _invalidate_config("house_wallet")
+    return new_balance, new_shares
+
+
 def set_stock_price(ticker: str, price: int, hist: list, updated_at: str):
     conn = _conn()
     cursor = conn.cursor()
