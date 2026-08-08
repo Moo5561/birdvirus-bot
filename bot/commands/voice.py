@@ -224,7 +224,14 @@ def setup_voice(client: commands.Bot):
                 await ctx.reply("no droid audio file found on disk, sad")
                 return
             queue_audio(ctx.voice_client, audio_file)
-            await ctx.reply("queued: `droid`", ephemeral=True)
+            coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+            reward = random.randint(7, 25)
+            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, reward)
+            await asyncio.to_thread(db.update_house, -reward)
+            await ctx.reply(
+                f"queued: `droid` +{reward} {coin_emoji} for your services (balance: {new_balance})",
+                ephemeral=True,
+            )
         except Exception as e:
             await ctx.reply(f"error queueing audio: {e}")
 
