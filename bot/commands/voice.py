@@ -204,7 +204,7 @@ def setup_voice(client: commands.Bot):
             return
 
         try:
-            queue_audio(ctx.voice_client, "droid.mp3")
+            queue_audio(ctx.voice_client, "droid_sound.mp3")
             await ctx.reply("queued: `droid`")
         except Exception as e:
             await ctx.reply(f"error queueing audio: {e}")
