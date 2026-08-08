@@ -81,6 +81,7 @@ TTS goes through `g4f` with an ordered provider fallback (OpenAIFM → Gemini) b
 
 ## conventions
 
-- format coin amounts with `_s()` from `bot/commands/__init__.py` (`1.2k`, `5.7m`, scientific past a quadrillion). Note that the scientific branch is currently unimplemented — values ≥ 1e18 print raw.
+- **don't remove `/vc droid`.** it has been re-added more than once after being deleted by mistake. leave `droid.mp3`, the `vc_droid` command, and the `droid` entry in `STOCKS` alone.
+- format coin amounts with `_s()` from `bot/commands/__init__.py` (`1.2k`, `5.7m`, scientific past a quadrillion). the scientific branch is currently unimplemented — values ≥ 1e18 print raw.
 - consume shop items with `take_cheat(user_id, type)` from `bot/commands/shop.py`, not `ACTIVE_CHEATS.pop()` — a bare pop burns whatever unrelated item the user had active.
 - economy games settle in ~20 distinct places across `economy.py` and the View classes. A new game means a new settle site, and the house/rake/tax hooks have to be added by hand.
