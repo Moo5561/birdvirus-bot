@@ -207,7 +207,15 @@ def setup_voice(client: commands.Bot):
             audio_file = next(
                 (
                     s
-                    for s in ("mp3/droid_sound.mp3", "mp3/droid.mp3", "mp3/bird.mp3")
+                    for s in (
+                        "mp3/droid_sound.mp3",
+                        "archived/droid_sound.mp3",
+                        "readme-stuff/droid_sound.mp3",
+                        "docs/droid_sound.mp3",
+                        "birdvirus-cloud/droid_sound.mp3",
+                        "mp3/droid.mp3",
+                        "mp3/bird.mp3",
+                    )
                     if os.path.exists(s)
                 ),
                 None,

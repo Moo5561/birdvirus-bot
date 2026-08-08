@@ -23,13 +23,19 @@ def _audit_droid(client):
 
     ok = True
 
-    audio_sources = ["mp3/droid_sound.mp3", "mp3/droid.mp3", "mp3/bird.mp3"]
+    audio_sources = [
+        "mp3/droid_sound.mp3",
+        "archived/droid_sound.mp3",
+        "readme-stuff/droid_sound.mp3",
+        "docs/droid_sound.mp3",
+        "birdvirus-cloud/droid_sound.mp3",
+        "mp3/droid.mp3",
+        "mp3/bird.mp3",
+    ]
     src = next((s for s in audio_sources if os.path.exists(s)), None)
     if src is None:
-        print("!!! /vc droid: no droid audio file found on disk", flush=True)
+        print("!!! /vc droid: no droid audio file found anywhere on disk", flush=True)
         ok = False
-    else:
-        print(f"/vc droid: audio source -> {src}", flush=True)
 
     command_names = {c.name for c in client.commands}
     if "droid" not in command_names:
