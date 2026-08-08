@@ -225,11 +225,10 @@ def setup_voice(client: commands.Bot):
                 return
             queue_audio(ctx.voice_client, audio_file)
             coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-            reward = random.randint(7, 25)
-            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, reward)
-            await asyncio.to_thread(db.update_house, -reward)
+            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, -1)
+            await asyncio.to_thread(db.update_house, 1)
             await ctx.reply(
-                f"queued: `droid` +{reward} {coin_emoji} for your services (balance: {new_balance})",
+                f"queued: `droid` -1 {coin_emoji} for the droid's upkeep (balance: {new_balance})",
                 ephemeral=True,
             )
         except Exception as e:
