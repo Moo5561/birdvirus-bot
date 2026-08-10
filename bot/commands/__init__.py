@@ -174,6 +174,9 @@ from .job import setup_job
 from .update import setup_update
 from .shop import setup_shop
 from .stocks import setup_stocks
+from .crash import setup_crash
+from .crypto import setup_crypto
+from .pet import setup_pet
 
 
 def setup(client: commands.Bot):
@@ -188,3 +191,6 @@ def setup(client: commands.Bot):
     setup_update(client)
     setup_shop(client)
     setup_stocks(client)
+    setup_crash(client)
+    setup_crypto(client)
+    setup_pet(client)

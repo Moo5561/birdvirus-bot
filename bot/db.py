@@ -181,6 +181,34 @@ def init_db():
         )
     """)
 
+    # crypto miner wallets
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS crypto_wallets (
+            user_id INTEGER PRIMARY KEY,
+            balance TEXT DEFAULT '0',
+            rig_level INTEGER DEFAULT 1,
+            mined_total TEXT DEFAULT '0',
+            last_mine TEXT
+        )
+    """)
+
+    # 宠物表 — 每个玩家的宠物 (pet system, one pet per player)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pets (
+            user_id INTEGER PRIMARY KEY,
+            name TEXT,
+            species TEXT,
+            hunger INTEGER DEFAULT 50,
+            mood INTEGER DEFAULT 50,
+            energy INTEGER DEFAULT 50,
+            level INTEGER DEFAULT 1,
+            xp INTEGER DEFAULT 0,
+            fed_total INTEGER DEFAULT 0,
+            last_fed TEXT,
+            last_played TEXT
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -969,6 +997,134 @@ def set_stock_shares(user_id: int, ticker: str, shares: int):
     )
     conn.commit()
     cursor.close()
+
+
+# Crypto Miner Wallet
+def get_crypto_wallet(user_id: int) -> dict:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT balance, rig_level, mined_total, last_mine FROM crypto_wallets WHERE user_id = ?",
+        (user_id,),
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    if not row:
+        return {"balance": 0, "rig_level": 1, "mined_total": 0, "last_mine": None}
+    return {
+        "balance": int(row[0]),
+        "rig_level": int(row[1]),
+        "mined_total": int(row[2]),
+        "last_mine": row[3],
+    }
+
+
+def set_crypto_wallet(user_id: int, balance: int, rig_level: int, mined_total: int, last_mine: str):
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO crypto_wallets (user_id, balance, rig_level, mined_total, last_mine) "
+        "VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(user_id) DO UPDATE SET balance = ?, rig_level = ?, mined_total = ?, last_mine = ?",
+        (user_id, balance, rig_level, mined_total, last_mine, balance, rig_level, mined_total, last_mine),
+    )
+    conn.commit()
+    cursor.close()
+
+
+def get_crypto_leaderboard(limit: int = 10) -> list:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT user_id, balance, mined_total FROM crypto_wallets ORDER BY mined_total DESC LIMIT ?",
+        (limit,),
+    )
+    rows = cursor.fetchall()
+    cursor.close()
+    return rows
+
+
+# 宠物系统 (Pet System)
+def get_pet(user_id: int) -> dict:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT name, species, hunger, mood, energy, level, xp, fed_total, last_fed, last_played "
+        "FROM pets WHERE user_id = ?",
+        (user_id,),
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    if not row:
+        return None
+    return {
+        "name": row[0],
+        "species": row[1],
+        "hunger": int(row[2]),
+        "mood": int(row[3]),
+        "energy": int(row[4]),
+        "level": int(row[5]),
+        "xp": int(row[6]),
+        "fed_total": int(row[7]),
+        "last_fed": row[8],
+        "last_played": row[9],
+    }
+
+
+def set_pet(user_id: int, params: dict):
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO pets (user_id, name, species, hunger, mood, energy, level, xp, fed_total, last_fed, last_played) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT(user_id) DO UPDATE SET "
+        "name = excluded.name, species = excluded.species, "
+        "hunger = excluded.hunger, mood = excluded.mood, energy = excluded.energy, "
+        "level = excluded.level, xp = excluded.xp, fed_total = excluded.fed_total, "
+        "last_fed = excluded.last_fed, last_played = excluded.last_played",
+        (
+            user_id,
+            params["name"],
+            params["species"],
+            params["hunger"],
+            params["mood"],
+            params["energy"],
+            params["level"],
+            params["xp"],
+            params["fed_total"],
+            params.get("last_fed"),
+            params.get("last_played"),
+        ),
+    )
+    conn.commit()
+    cursor.close()
+
+
+def get_all_pets() -> list:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT user_id, name, species, hunger, mood, energy, level, xp, fed_total, last_fed, last_played "
+        "FROM pets"
+    )
+    rows = cursor.fetchall()
+    cursor.close()
+    return [
+        {
+            "user_id": r[0],
+            "name": r[1],
+            "species": r[2],
+            "hunger": int(r[3]),
+            "mood": int(r[4]),
+            "energy": int(r[5]),
+            "level": int(r[6]),
+            "xp": int(r[7]),
+            "fed_total": int(r[8]),
+            "last_fed": r[9],
+            "last_played": r[10],
+        }
+        for r in rows
+    ]
 
 
 init_db()

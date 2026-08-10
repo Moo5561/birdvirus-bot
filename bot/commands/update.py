@@ -60,37 +60,40 @@ def setup_update(client: commands.Bot):
         with open(SNAPSHOT_FILE, "w") as f:
             f.write(head_before + "\n")
 
-        await ctx.reply("pulling latest code...")
+        await ctx.reply("fetching latest code...")
 
         subprocess.run(["git", "rm", "--cached", "birdvirus.db"], capture_output=True, timeout=10)
 
         try:
-            result = subprocess.run(
-                ["git", "pull", "--autostash"], capture_output=True, text=True, timeout=30
+            fetch = subprocess.run(
+                ["git", "fetch", "origin", "main"], capture_output=True, text=True, timeout=30
             )
-            output = result.stdout + result.stderr
+            result = subprocess.run(
+                ["git", "reset", "--hard", "origin/main"], capture_output=True, text=True, timeout=30
+            )
+            output = (fetch.stdout + fetch.stderr) + (result.stdout + result.stderr)
         except Exception as e:
-            await ctx.reply(f"git pull failed: {e}")
-            await dm_user(ctx.author, f"update failed: git pull error — {e}")
+            await ctx.reply(f"git update failed: {e}")
+            await dm_user(ctx.author, f"update failed: git error — {e}")
             os.remove(SNAPSHOT_FILE)
             return
 
         if result.returncode != 0:
             await ctx.reply(
-                f"git pull returned non-zero exit:\n```\n{output[:1500]}```"
+                f"update returned non-zero exit:\n```\n{output[:1500]}```"
             )
             await dm_user(
                 ctx.author,
-                f"update failed: git pull returned non-zero exit:\n```\n{output[:1500]}```",
+                f"update failed: git error:\n```\n{output[:1500]}```",
             )
             os.remove(SNAPSHOT_FILE)
             return
 
-        await ctx.reply(f"git pull done:\n```\n{output[:1500]}```")
+        await ctx.reply(f"update done:\n```\n{output[:1500]}```")
 
-        if "Already up to date" in output:
+        if "HEAD is now at" not in output:
             os.remove(SNAPSHOT_FILE)
-            await ctx.reply("nothing new to pull.")
+            await ctx.reply("already on the latest commit.")
             return
 
         await ctx.reply("checking syntax...")
