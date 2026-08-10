@@ -66,7 +66,7 @@ def setup_update(client: commands.Bot):
 
         try:
             result = subprocess.run(
-                ["git", "pull", "--autostash"], capture_output=True, text=True, timeout=30
+                ["git", "pull", "--rebase", "--autostash"], capture_output=True, text=True, timeout=30
             )
             output = result.stdout + result.stderr
         except Exception as e:
