@@ -196,6 +196,41 @@ def setup_voice(client: commands.Bot):
             await ctx.reply(f"error playing audio: {e}")
 
     @vc_group.command(
+        name="fart", description="make the bot fart in the voice channel (35% chance it's audible)"
+    )
+    async def vc_fart(ctx: commands.Context):
+        if ctx.voice_client is None:
+            await ctx.reply("i'm not in a voice channel. use `/vc join` first")
+            return
+
+        if ctx.voice_client.is_playing():
+            await ctx.reply("i'm already playing something")
+            return
+
+        if random.random() < 0.35:
+            try:
+                audio_file = next(
+                    (
+                        s
+                        for s in (
+                            "mp3/fart.mp3",
+                            "fart_sound.mp3",
+                        )
+                        if os.path.exists(s)
+                    ),
+                    None,
+                )
+                if audio_file is None:
+                    await ctx.reply("no fart audio file found on disk, sad")
+                    return
+                queue_audio(ctx.voice_client, audio_file)
+                await ctx.reply("💨", ephemeral=True)
+            except Exception as e:
+                await ctx.reply(f"error queueing audio: {e}")
+        else:
+            await ctx.reply("silent but deadly... nothing came out", ephemeral=True)
+
+    @vc_group.command(
         name="droid", description="play a droid sound in the voice channel"
     )
     async def vc_droid(ctx: commands.Context):
