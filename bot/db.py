@@ -1044,6 +1044,46 @@ def get_crypto_leaderboard(limit: int = 10) -> list:
     return rows
 
 
+def cashout_crypto(user_id: int, take: int, payout: int, coin_emoji: str = "🪙") -> int:
+    """move mined crypto into the main economy in one transaction.
+
+    wallet deduction and economy credit used to be separate commits, so a
+    crash between them either paid out without deducting or deducted without
+    paying. validates the wallet balance inside the same transaction.
+    """
+    conn = _conn()
+    cursor = conn.cursor()
+    wallet = get_crypto_wallet(user_id)
+    if wallet["balance"] < take:
+        cursor.close()
+        raise ValueError("wallet balance too low")
+    remain = wallet["balance"] - take
+    cursor.execute(
+        "INSERT INTO crypto_wallets (user_id, balance, rig_level, mined_total, last_mine) "
+        "VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(user_id) DO UPDATE SET balance = ?",
+        (user_id, remain, wallet["rig_level"], wallet["mined_total"], wallet["last_mine"], remain),
+    )
+    row = cursor.execute(
+        "SELECT balance FROM economy WHERE user_id = ?", (user_id,)
+    ).fetchone()
+    if row is None:
+        new_balance = 100 + payout
+        cursor.execute(
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, ?, '0', '0')",
+            (user_id, str(new_balance)),
+        )
+    else:
+        new_balance = _safe_int(row[0]) + payout
+        cursor.execute(
+            "UPDATE economy SET balance = ? WHERE user_id = ?", (str(new_balance), user_id)
+        )
+    conn.commit()
+    cursor.close()
+    _invalidate_config("house_wallet")
+    return new_balance
+
+
 # 宠物系统 (Pet System)
 def get_pet(user_id: int) -> dict:
     conn = _conn()

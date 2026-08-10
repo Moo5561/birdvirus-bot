@@ -4,10 +4,25 @@ import discord
 import bot.db as db
 from bot.commands import track_gamble
 
+VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+SUITS = ['♠', '♥', '♦', '♣']
+
+
+def _build_deck():
+    return [(v, s) for s in SUITS for v in VALUES]
+
+
+deck = []
+
+
 def draw_card():
-    suits = ['♠', '♥', '♦', '♣']
-    values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
-    return (random.choice(values), random.choice(suits))
+    """draw from a real, shuffled 52-card deck; reshuffle when it runs out.
+    no card can repeat within a hand because there are no duplicates to draw."""
+    global deck
+    if not deck:
+        deck = _build_deck()
+        random.shuffle(deck)
+    return deck.pop()
 
 def calculate_hand(hand):
     value = 0
@@ -122,29 +137,17 @@ class BlackjackView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=self)
 
     async def on_timeout(self):
+        # never settle a win/loss here — the player saw the revealed state and
+        # could pick the favourable side. void the round, no balance change.
         if self._game_unlock:
             self._game_unlock(self.ctx)
         for item in self.children:
             item.disabled = True
-        
-        while calculate_hand(self.dealer_hand) < 17:
-            self.dealer_hand.append(draw_card())
-            
-        player_score = calculate_hand(self.player_hand)
-        dealer_score = calculate_hand(self.dealer_hand)
-        
-        if dealer_score > 21 or player_score > dealer_score:
-            new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, self.bet)
-            await track_gamble(self.ctx, self.bet)
-            status_text = f"timed out but you won {self.bet} {self.coin_emoji} (balance: {new_balance})"
-        elif player_score < dealer_score:
-            new_balance = await asyncio.to_thread(db.update_balance, self.ctx.author.id, -self.bet)
-            await track_gamble(self.ctx, -self.bet)
-            status_text = f"timed out and lost {self.bet} {self.coin_emoji} (balance: {new_balance})"
-        else:
-            status_text = "timed out - pushed (bet refunded)"
-            
-        embed = self.get_embed(hide_dealer=False, status=status_text)
+
+        embed = self.get_embed(
+            hide_dealer=False,
+            status=f"timed out — round voided, nothing won or lost",
+        )
         try:
             await self.message.edit(embed=embed, view=self)
         except:

@@ -165,19 +165,18 @@ def setup_crypto(client: commands.Bot):
 
         cut = int(take * CASHOUT_CUT)
         payout = take - cut
-        await asyncio.to_thread(db.update_balance, ctx.author.id, payout)
-        await asyncio.to_thread(
-            db.set_crypto_wallet,
-            ctx.author.id,
-            avail - take,
-            wallet["rig_level"],
-            wallet["mined_total"],
-            wallet["last_mine"],
-        )
+        try:
+            new_balance = await asyncio.to_thread(
+                db.cashout_crypto, ctx.author.id, take, payout
+            )
+        except ValueError:
+            await _report(ctx, "your wallet ran out of crypto mid-cashout — try again. ")
+            return
         await _report(
             ctx,
             f"cashed out **{_s(payout)} coins** ({_s(take)} crypto, "
-            f"the house kept {_s(cut)}). wallet: **{_s(avail - take)}**",
+            f"the house kept {_s(cut)}). wallet: **{_s(avail - take)}**. "
+            f"balance: **{_s(new_balance)}**",
             title="💰 cashout complete",
         )
 

@@ -14,6 +14,10 @@ ILLEGAL_END = dt_time(20, 0)
 ACTIVE_CHEATS = {}
 SHOP_OVERRIDE = None  # None = auto, "open" = force open, "closed" = force closed
 
+# per-user per-day cap on the guarantee-win back alley items
+ILLEGAL_DAILY_CAP = 3
+_ILLEGAL_BUYS = {}  # user_id -> (iso date string, count)
+
 
 def take_cheat(user_id, cheat_type):
     """consume the user's active cheat only if it matches cheat_type.
@@ -104,6 +108,25 @@ async def is_illegal_open():
     return hour >= start or hour <= end
 
 
+def illegal_remaining_today(user_id):
+    """how many back-alley buys this user has left today."""
+    day = datetime.utcnow().date().isoformat()
+    entry = _ILLEGAL_BUYS.get(user_id)
+    if entry is None or entry[0] != day:
+        _ILLEGAL_BUYS[user_id] = (day, 0)
+        return ILLEGAL_DAILY_CAP
+    return max(0, ILLEGAL_DAILY_CAP - entry[1])
+
+
+def _record_illegal_buy(user_id):
+    day = datetime.utcnow().date().isoformat()
+    entry = _ILLEGAL_BUYS.get(user_id)
+    if entry is None or entry[0] != day:
+        _ILLEGAL_BUYS[user_id] = (day, 1)
+    else:
+        _ILLEGAL_BUYS[user_id] = (day, entry[1] + 1)
+
+
 async def get_balance_safe(ctx, user_id):
     if is_nightly(ctx.bot):
         return 999999999999999999999999999
@@ -165,6 +188,12 @@ def setup_shop(client: commands.Bot):
             await ctx.reply(f"that item is only available from the back alley between {start:02d}:00-{end:02d}:00 utc")
             return
 
+        if item_data in ILLEGAL_ITEMS:
+            remaining = illegal_remaining_today(ctx.author.id)
+            if remaining <= 0:
+                await ctx.reply(f"you've hit your daily limit of back alley buys ({ILLEGAL_DAILY_CAP}/day). come back tomorrow")
+                return
+
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
 
         bal = await get_balance_safe(ctx, ctx.author.id)
@@ -174,6 +203,8 @@ def setup_shop(client: commands.Bot):
 
         await asyncio.to_thread(db.update_balance, ctx.author.id, -item_data["price"])
         await asyncio.to_thread(db.add_item, ctx.author.id, item_key)
+        if item_data in ILLEGAL_ITEMS:
+            _record_illegal_buy(ctx.author.id)
 
         await ctx.reply(f"you bought **{item_data['emoji']} {item_key.title()}** for {item_data['price']} {coin_emoji}. use `%use {item_key}` to activate it!")
 

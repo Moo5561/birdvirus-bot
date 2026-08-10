@@ -31,7 +31,7 @@ def _roll_crash_mult():
     P(> m) = HOUSE_EDGE / m distribution so the house keeps our edge."""
     u = random.random()
     mult = HOUSE_EDGE / (u or 1e-9)
-    return max(1.20, mult)
+    return max(1.20, min(100.0, mult))
 
 
 class CrashView(discord.ui.View):
@@ -60,7 +60,7 @@ class CrashView(discord.ui.View):
         embed.description = (
             f"`{self._bar()}`\n"
             f"cash out now to lock in **{_s(_payout(self.bet, self.mult))} {self.coin_emoji}**\n"
-            f"bet: **{self.bet} {self.coin_emoji}** | crashes at **{self.crash_mult:.2f}x**"
+            f"bet: **{self.bet} {self.coin_emoji}**"
         )
         embed.set_footer(text=status)
         return embed

@@ -656,7 +656,10 @@ def setup_economy(client: commands.Bot):
         path = [pos]
         for _ in range(7):
             pos += random.choice([-1, 1])
-            pos = max(0, min(6, pos))
+            if pos < 0:
+                pos = 1
+            elif pos > 6:
+                pos = 5
             path.append(pos)
 
         final_slot = path[-1]
@@ -735,7 +738,10 @@ def setup_economy(client: commands.Bot):
         rows = 10
         for _ in range(rows):
             pos += random.choice([-1, 1])
-            pos = max(0, min(7, pos))
+            if pos < 0:
+                pos = 1
+            elif pos > 7:
+                pos = 6
             path.append(pos)
 
         final_slot = path[-1]
