@@ -56,7 +56,7 @@ def _display(pet):
         f"Mood: {_bar(_clamp(pet['mood']))} **{_clamp(pet['mood'])}/100**\n"
         f"Energy: {_bar(_clamp(pet['energy']))} **{_clamp(pet['energy'])}/100**\n"
     )
-    embed.set_footer(text="use /adopt /feed /play /pet to take care of it")
+    embed.set_footer(text="use /adopt /feed /playwith /pet to take care of it")
     return embed
 
 
@@ -195,7 +195,7 @@ def setup_pets(client: commands.Bot):
             color=0x2ecc71 if mood_gain == 12 else 0xf39c12,
         )
 
-    @client.hybrid_command(name="play", description="play with your pet")
+    @client.hybrid_command(name="playwith", description="play with your pet")
     async def play(ctx: commands.Context):
         pet_data = await asyncio.to_thread(db.get_pet, ctx.author.id)
         if not pet_data:
