@@ -181,6 +181,17 @@ def init_db():
         )
     """)
 
+    # crypto miner wallets
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS crypto_wallets (
+            user_id INTEGER PRIMARY KEY,
+            balance TEXT DEFAULT '0',
+            rig_level INTEGER DEFAULT 1,
+            mined_total TEXT DEFAULT '0',
+            last_mine TEXT
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -969,6 +980,51 @@ def set_stock_shares(user_id: int, ticker: str, shares: int):
     )
     conn.commit()
     cursor.close()
+
+
+# Crypto Miner Wallet
+def get_crypto_wallet(user_id: int) -> dict:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT balance, rig_level, mined_total, last_mine FROM crypto_wallets WHERE user_id = ?",
+        (user_id,),
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    if not row:
+        return {"balance": 0, "rig_level": 1, "mined_total": 0, "last_mine": None}
+    return {
+        "balance": int(row[0]),
+        "rig_level": int(row[1]),
+        "mined_total": int(row[2]),
+        "last_mine": row[3],
+    }
+
+
+def set_crypto_wallet(user_id: int, balance: int, rig_level: int, mined_total: int, last_mine: str):
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO crypto_wallets (user_id, balance, rig_level, mined_total, last_mine) "
+        "VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(user_id) DO UPDATE SET balance = ?, rig_level = ?, mined_total = ?, last_mine = ?",
+        (user_id, balance, rig_level, mined_total, last_mine, balance, rig_level, mined_total, last_mine),
+    )
+    conn.commit()
+    cursor.close()
+
+
+def get_crypto_leaderboard(limit: int = 10) -> list:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT user_id, balance, mined_total FROM crypto_wallets ORDER BY mined_total DESC LIMIT ?",
+        (limit,),
+    )
+    rows = cursor.fetchall()
+    cursor.close()
+    return rows
 
 
 init_db()
