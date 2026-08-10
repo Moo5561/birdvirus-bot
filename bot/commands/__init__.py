@@ -163,6 +163,34 @@ async def track_gamble(ctx, net_gain):
     await asyncio.to_thread(db.update_house, -net_gain)
 
 
+async def apply_income_tax(ctx, user_id, amount):
+    """income tax on non-gambling earnings (jobs, fish, beg, crypto cashouts).
+
+    rate lives in config `income_tax_rate` (percent, 0 disables, default 15).
+    returns the tax amount taken (0 if disabled). identical money flow to
+    the gambling tax: player pays, house collects, lifetime total tracked.
+    """
+    if amount <= 0:
+        return 0
+    rate_str = await asyncio.to_thread(db.get_config, "income_tax_rate", "15")
+    try:
+        rate = int(rate_str)
+    except (TypeError, ValueError):
+        rate = 15
+    if rate <= 0 or is_nightly(ctx.bot):
+        return 0
+    tax = max(1, int(amount * rate / 100))
+    await asyncio.to_thread(db.update_balance, user_id, -tax)
+    await asyncio.to_thread(db.update_house, tax)
+    collected = await asyncio.to_thread(db.get_config, "income_tax_collected", "0")
+    try:
+        total = int(collected)
+    except (TypeError, ValueError):
+        total = 0
+    await asyncio.to_thread(db.set_config, "income_tax_collected", str(total + tax))
+    return tax
+
+
 from .blackjack import setup_blackjack
 from .voice import setup_voice
 from .economy import setup_economy

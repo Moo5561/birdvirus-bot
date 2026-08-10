@@ -336,13 +336,29 @@ def setup_admin(client: commands.Bot):
         await asyncio.to_thread(db.set_config, "tax_rate", str(percent))
         await ctx.reply(f"set tax rate to {percent}% on gambling winnings")
 
+    @ec_incometax_command := ec_group.command(name="incometax", description="set the income tax rate on jobs, fish, beg, crypto cashouts (admin only)")
+    @is_admin()
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(percent="income tax rate as a percentage (0 to disable)")
+    async def ec_incometax(ctx: commands.Context, percent: int):
+        if percent < 0 or percent > 100:
+            await ctx.reply("tax rate must be between 0 and 100")
+            return
+        await asyncio.to_thread(db.set_config, "income_tax_rate", str(percent))
+        await ctx.reply(f"set income tax rate to {percent}% on jobs, fish, beg, and crypto cashouts")
+
     @ec_taxinfo_command := ec_group.command(name="taxinfo", description="view tax info (admin only)")
     @is_admin()
     async def ec_taxinfo(ctx: commands.Context):
         rate = await asyncio.to_thread(db.get_config, "tax_rate", "0")
         collected = await asyncio.to_thread(db.get_config, "tax_collected", "0")
+        income_rate = await asyncio.to_thread(db.get_config, "income_tax_rate", "15")
+        income_collected = await asyncio.to_thread(db.get_config, "income_tax_collected", "0")
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        await ctx.reply(f"tax rate: {rate}% | total collected: {_s(int(collected))} {coin_emoji}")
+        await ctx.reply(
+            f"gambling tax: {rate}% ({_s(int(collected))} {coin_emoji} collected)\n"
+            f"income tax: {income_rate}% ({_s(int(income_collected))} {coin_emoji} collected)"
+        )
 
     @ec_debtforgive_command := ec_group.command(name="debtforgive", description="forgive a user's debt (admin only)")
     @is_admin()

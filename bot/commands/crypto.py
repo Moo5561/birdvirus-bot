@@ -165,9 +165,17 @@ def setup_crypto(client: commands.Bot):
 
         cut = int(take * CASHOUT_CUT)
         payout = take - cut
+        income_tax = 0
+        if not is_nightly(ctx.bot):
+            try:
+                income_tax = int(await asyncio.to_thread(db.get_config, "income_tax_rate", "15")) or 0
+            except (TypeError, ValueError):
+                income_tax = 0
+            if income_tax > 0:
+                income_tax = max(1, int(payout * income_tax / 100))
         try:
-            new_balance = await asyncio.to_thread(
-                db.cashout_crypto, ctx.author.id, take, payout
+            new_balance, income_tax = await asyncio.to_thread(
+                db.cashout_crypto, ctx.author.id, take, payout, income_tax
             )
         except ValueError:
             await _report(ctx, "your wallet ran out of crypto mid-cashout — try again. ")
@@ -175,8 +183,9 @@ def setup_crypto(client: commands.Bot):
         await _report(
             ctx,
             f"cashed out **{_s(payout)} coins** ({_s(take)} crypto, "
-            f"the house kept {_s(cut)}). wallet: **{_s(avail - take)}**. "
-            f"balance: **{_s(new_balance)}**",
+            f"the house kept {_s(cut)}"
+            + (f", income tax {_s(income_tax)}" if income_tax else "")
+            + f"). wallet: **{_s(avail - take)}**. balance: **{_s(new_balance)}**",
             title="💰 cashout complete",
         )
 

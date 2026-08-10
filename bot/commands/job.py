@@ -4,7 +4,7 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
-from bot.commands import is_nightly
+from bot.commands import is_nightly, apply_income_tax
 from bot.commands.shop import take_cheat
 from datetime import datetime, timedelta
 from typing import Literal
@@ -156,7 +156,11 @@ async def handle_job_reward(ctx, job_name, job_data, success, game_message, cust
     # Handle random event
     event_payout, event_desc = await trigger_random_event(ctx, job_name, level)
     total_payout = payout + event_payout
-    
+
+    income_tax = 0
+    if total_payout > 0:
+        income_tax = await apply_income_tax(ctx, ctx.author.id, total_payout)
+
     new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, total_payout)
     time_str = datetime.utcnow().isoformat()
     level_up, new_level = await asyncio.to_thread(db.update_job_progress, ctx.author.id, xp_gain, time_str)
@@ -171,7 +175,10 @@ async def handle_job_reward(ctx, job_name, job_data, success, game_message, cust
     if event_desc:
         result_text += f"\n⚠️ **Random Event:** {event_desc} ({event_payout} {coin_emoji})\n"
         
-    result_text += f"\n+ earned a total of {total_payout} {coin_emoji} (balance: {new_balance})\n+ gained {xp_gain} xp"
+    result_text += f"\n+ earned a total of {total_payout} {coin_emoji}"
+    if income_tax:
+        result_text += f" (tax: -{income_tax} {coin_emoji})"
+    result_text += f"\n+ net take-home: {total_payout - income_tax} {coin_emoji} (balance: {new_balance})\n+ gained {xp_gain} xp"
     
     if level_up:
         new_title = get_job_title(job_name, new_level)

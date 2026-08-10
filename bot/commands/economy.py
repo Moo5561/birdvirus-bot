@@ -4,7 +4,7 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
-from bot.commands import is_admin, is_nightly, game_lock, game_unlock, _s, claim_streak_bonus, track_gamble, is_dev
+from bot.commands import is_admin, is_nightly, game_lock, game_unlock, _s, claim_streak_bonus, track_gamble, is_dev, apply_income_tax
 from bot.commands.blackjack import BlackjackView, draw_card
 from bot.commands.horserace import HorseRaceView
 from bot.commands.catrace import CatRaceView
@@ -859,13 +859,15 @@ def setup_economy(client: commands.Bot):
         house = await asyncio.to_thread(db.get_house)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         tax_collected = await asyncio.to_thread(db.get_config, "tax_collected", "0")
+        income_tax_collected = await asyncio.to_thread(db.get_config, "income_tax_collected", "0")
         rake_pct = await asyncio.to_thread(db.get_config, "house_rake", "25")
         status = "📈 the house is up" if house >= 0 else "📉 the house is in the hole"
         devs = await asyncio.to_thread(db.get_config, "house_devs", "the devs")
         await ctx.reply(f"🏦 **house wallet:** {_s(house)} {coin_emoji} ({status})\n"
                         f"👑 **house owners:** {devs}\n"
                         f"🪒 **house rake:** {rake_pct}% on all wins\n"
-                        f"💰 lifetime tax collected: {_s(int(tax_collected))} {coin_emoji}\n"
+                        f"💰 lifetime gambling tax collected: {_s(int(tax_collected))} {coin_emoji}\n"
+                        f"🧾 lifetime income tax collected: {_s(int(income_tax_collected))} {coin_emoji}\n"
                         f"_gambling losses flow in, wins + streaks + insurance flow out_")
 
     @pure_houseclaim_command := pure_group.command(name="houseclaim", description="dev-only: claim the house wallet earnings")
@@ -947,15 +949,16 @@ def setup_economy(client: commands.Bot):
         success = random.random() < 0.90
         if success:
             amount = random.randint(1, 15)
+            tax = await apply_income_tax(ctx, ctx.author.id, amount)
             new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, amount)
-            
+
             responses = [
                 f"some guy threw {amount} {coin_emoji} at you (balance: {new_balance})",
                 f"you found {amount} {coin_emoji} on the floor (balance: {new_balance})",
                 f"a kind stranger gave you {amount} {coin_emoji} (balance: {new_balance})",
                 f"you did some chores and got paid {amount} {coin_emoji} (balance: {new_balance})"
             ]
-            await ctx.reply(random.choice(responses))
+            await ctx.reply(random.choice(responses) + (f" (tax: {tax} {coin_emoji})" if tax else ""))
         else:
             responses = [
                 "someone told you to get a job lol",
@@ -993,8 +996,9 @@ def setup_economy(client: commands.Bot):
         
         if caught["max"] > 0:
             amount = random.randint(caught["min"], caught["max"]) * fish_mult
+            tax = await apply_income_tax(ctx, ctx.author.id, amount)
             new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, amount)
-            await ctx.reply(f"you cast your line and caught a {caught['emoji']} {caught['name']}! you sold it for {amount} {coin_emoji} (balance: {new_balance})")
+            await ctx.reply(f"you cast your line and caught a {caught['emoji']} {caught['name']}! you sold it for {amount} {coin_emoji}" + (f" (tax: {tax} {coin_emoji})" if tax else "") + f" (balance: {new_balance})")
         else:
             await ctx.reply(f"you cast your line and caught a {caught['emoji']} {caught['name']}. it's worthless. better luck next time.")
 

@@ -1044,12 +1044,15 @@ def get_crypto_leaderboard(limit: int = 10) -> list:
     return rows
 
 
-def cashout_crypto(user_id: int, take: int, payout: int, coin_emoji: str = "🪙") -> int:
+def cashout_crypto(user_id: int, take: int, payout: int, income_tax: int = 0) -> tuple[int, int]:
     """move mined crypto into the main economy in one transaction.
 
     wallet deduction and economy credit used to be separate commits, so a
     crash between them either paid out without deducting or deducted without
     paying. validates the wallet balance inside the same transaction.
+
+    income tax (if any) is deducted in the same transaction: payout is the
+    gross credit, income_tax the cut for the state. returns (new_balance, tax).
     """
     conn = _conn()
     cursor = conn.cursor()
@@ -1064,24 +1067,38 @@ def cashout_crypto(user_id: int, take: int, payout: int, coin_emoji: str = "🪙
         "ON CONFLICT(user_id) DO UPDATE SET balance = ?",
         (user_id, remain, wallet["rig_level"], wallet["mined_total"], wallet["last_mine"], remain),
     )
+    net = payout - income_tax
     row = cursor.execute(
         "SELECT balance FROM economy WHERE user_id = ?", (user_id,)
     ).fetchone()
     if row is None:
-        new_balance = 100 + payout
+        new_balance = 100 + net
         cursor.execute(
             "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, ?, '0', '0')",
             (user_id, str(new_balance)),
         )
     else:
-        new_balance = _safe_int(row[0]) + payout
+        new_balance = _safe_int(row[0]) + net
         cursor.execute(
             "UPDATE economy SET balance = ? WHERE user_id = ?", (str(new_balance), user_id)
+        )
+    if income_tax:
+        cursor.execute(
+            "INSERT INTO config (key, value) VALUES ('house_wallet', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + CAST(? AS INTEGER)",
+            (str(income_tax), str(income_tax)),
+        )
+        collected = get_config("income_tax_collected", "0")
+        cursor.execute(
+            "INSERT INTO config (key, value) VALUES ('income_tax_collected', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + CAST(? AS INTEGER)",
+            (str(int(collected) + income_tax), str(income_tax)),
         )
     conn.commit()
     cursor.close()
     _invalidate_config("house_wallet")
-    return new_balance
+    _invalidate_config("income_tax_collected")
+    return new_balance, income_tax
 
 
 # 宠物系统 (Pet System)
