@@ -11,6 +11,7 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 from bot.config import apikey
+from bot.commands import is_nightly
 import bot.db as db
 from playwright.async_api import async_playwright
 from g4f.client import Client
@@ -497,7 +498,22 @@ def setup_utility(client: commands.Bot):
             f"🚽 {ctx.author.display_name} booby-trapped the toilet {victim} was about to sit on",
             f"🪓 {ctx.author.display_name} turned {victim} into a bird virus carrier",
         ]
-        await ctx.reply(f"**{random.choice(methods)}.** 💀")
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+
+        victim_bal, _, _ = await asyncio.to_thread(db.get_balances, user.id)
+        stolen = 0
+        if victim_bal > 0 and not is_nightly(ctx.bot):
+            stolen = max(1, int(victim_bal * random.uniform(0.05, 0.25)))
+            stolen = min(stolen, victim_bal)
+            await asyncio.to_thread(db.update_balance, user.id, -stolen)
+            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, stolen)
+
+        loot_text = (
+            f" (+{stolen} {coin_emoji} loot, {victim_bal - stolen} left on the corpse)"
+            if stolen
+            else f" (they were broke, no loot found)"
+        )
+        await ctx.reply(f"**{random.choice(methods)}.** 💀{loot_text}")
 
 
     # Internet Group
