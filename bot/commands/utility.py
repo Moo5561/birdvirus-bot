@@ -459,6 +459,47 @@ def setup_utility(client: commands.Bot):
                 pass
             await ctx.send(message)
 
+    # murder command
+    @client.command(name="murder", description="murder someone in cold blood")
+    async def murder(ctx: commands.Context, *, target: str):
+        if ctx.guild is None:
+            await ctx.reply("murder only works in a server")
+            return
+
+        if target.strip().lower() in ("me", "myself", "i"):
+            await ctx.reply("that's a little too real. get help")
+            return
+
+        user = None
+        try:
+            user = await commands.MemberConverter().convert(ctx, target)
+        except commands.BadArgument:
+            user = None
+
+        if user is None:
+            if ctx.message and ctx.message.mentions:
+                user = ctx.message.mentions[0]
+            else:
+                await ctx.reply("who do you want to murder? mention someone like `%murder @bird`")
+                return
+
+        if user.id == client.user.id:
+            await ctx.reply("nice try. i'm unkillable")
+            return
+
+        victim = user.display_name
+        methods = [
+            f"🔪 {ctx.author.display_name} shanked {victim} with a rusty butter knife",
+            f"💥 {ctx.author.display_name} detonated a landmine under {victim}'s chair",
+            f"🍕 {ctx.author.display_name} fed {victim} a pizza stuffed with 500 coins",
+            f"🐍 {ctx.author.display_name} let the birdvirus loose on {victim}",
+            f"⚖️ {ctx.author.display_name} sentenced {victim} to death for tax evasion",
+            f"🚽 {ctx.author.display_name} booby-trapped the toilet {victim} was about to sit on",
+            f"🪓 {ctx.author.display_name} turned {victim} into a bird virus carrier",
+        ]
+        await ctx.reply(f"**{random.choice(methods)}.** 💀")
+
+
     # Internet Group
     @client.hybrid_group(name="internet", description="internet commands")
     async def internet_group(ctx: commands.Context):
