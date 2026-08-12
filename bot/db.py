@@ -209,6 +209,21 @@ def init_db():
         )
     """)
 
+    # user cars garage
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_cars (
+            user_id INTEGER,
+            car_key TEXT,
+            name TEXT,
+            tier INTEGER DEFAULT 1,
+            mileage INTEGER DEFAULT 0,
+            wear INTEGER DEFAULT 0,
+            earned_total TEXT DEFAULT '0',
+            last_drive TEXT,
+            PRIMARY KEY (user_id, car_key)
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -1171,6 +1186,117 @@ def get_all_pets() -> list:
             "last_played": r[10],
         }
         for r in rows
+    ]
+
+
+# Cars
+def get_user_cars(user_id: int) -> list[dict]:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT car_key, name, tier, mileage, wear, earned_total, last_drive FROM user_cars WHERE user_id = ? ORDER BY tier DESC, mileage DESC",
+        (user_id,),
+    )
+    rows = cursor.fetchall()
+    cursor.close()
+    return [
+        {
+            "car_key": row[0],
+            "name": row[1],
+            "tier": int(row[2]),
+            "mileage": int(row[3]),
+            "wear": int(row[4]),
+            "earned_total": _safe_int(row[5]),
+            "last_drive": row[6],
+        }
+        for row in rows
+    ]
+
+
+def get_car(user_id: int, car_key: str) -> dict:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT car_key, name, tier, mileage, wear, earned_total, last_drive FROM user_cars WHERE user_id = ? AND car_key = ?",
+        (user_id, car_key),
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    if not row:
+        return None
+    return {
+        "car_key": row[0],
+        "name": row[1],
+        "tier": int(row[2]),
+        "mileage": int(row[3]),
+        "wear": int(row[4]),
+        "earned_total": _safe_int(row[5]),
+        "last_drive": row[6],
+    }
+
+
+def add_car(user_id: int, car_key: str, name: str, tier: int) -> bool:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT OR IGNORE INTO user_cars (user_id, car_key, name, tier) VALUES (?, ?, ?, ?)",
+        (user_id, car_key, name, tier),
+    )
+    inserted = cursor.rowcount > 0
+    conn.commit()
+    cursor.close()
+    return inserted
+
+
+def record_car_drive(user_id: int, car_key: str, miles: int, wear: int, earned: int, last_drive: str) -> dict:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE user_cars
+        SET mileage = mileage + ?,
+            wear = min(wear + ?, 100),
+            earned_total = CAST(CAST(earned_total AS INTEGER) + ? AS TEXT),
+            last_drive = ?
+        WHERE user_id = ? AND car_key = ?
+        """,
+        (miles, wear, earned, last_drive, user_id, car_key),
+    )
+    conn.commit()
+    cursor.close()
+    return get_car(user_id, car_key)
+
+
+def repair_car(user_id: int, car_key: str):
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE user_cars SET wear = 0 WHERE user_id = ? AND car_key = ?",
+        (user_id, car_key),
+    )
+    conn.commit()
+    cursor.close()
+
+
+def get_all_car_earnings(limit: int = 10) -> list[dict]:
+    conn = _conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT user_id, SUM(CAST(earned_total AS INTEGER)) AS earned, SUM(mileage) AS miles
+        FROM user_cars
+        GROUP BY user_id
+        HAVING earned > 0
+        ORDER BY earned DESC
+        LIMIT ?
+        """,
+        (limit,),
+    )
+    rows = cursor.fetchall()
+    cursor.close()
+    return [
+        {"user_id": row[0], "earned_total": _safe_int(row[1]), "mileage": int(row[2] or 0)}
+        for row in rows
     ]
 
 
