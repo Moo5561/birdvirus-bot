@@ -684,7 +684,12 @@ def setup_job(client: commands.Bot):
         if job_name not in JOBS:
             await ctx.reply("your job is invalid. please apply for a new one.")
             return
-            
+
+        cars = await asyncio.to_thread(db.get_user_cars, ctx.author.id)
+        if not cars:
+            await ctx.reply("you need a car to get to work. buy one with `/dealership` then `/buycar <car>`.")
+            return
+
         info = JOBS[job_name]
         
         # Check cooldown
