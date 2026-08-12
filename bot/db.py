@@ -376,20 +376,18 @@ def set_bank(user_id: int, amount: int):
 def update_balance(user_id: int, change: int) -> int:
     conn = _conn()
     cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO economy (user_id, balance, bank, debt)
+        VALUES (?, ?, '0', '0')
+        ON CONFLICT(user_id) DO UPDATE SET balance = CAST(CAST(balance AS INTEGER) + ? AS TEXT)
+        """,
+        (user_id, str(100 + change), change),
+    )
+    conn.commit()
     cursor.execute("SELECT balance FROM economy WHERE user_id = ?", (user_id,))
     row = cursor.fetchone()
-    if row is None:
-        new_balance = 100 + change
-        cursor.execute(
-            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, ?, '0', '0')",
-            (user_id, str(new_balance)),
-        )
-    else:
-        new_balance = _safe_int(row[0]) + change
-        cursor.execute(
-            "UPDATE economy SET balance = ? WHERE user_id = ?", (str(new_balance), user_id)
-        )
-    conn.commit()
+    new_balance = _safe_int(row[0]) if row else 0
     cursor.close()
     return new_balance
 
@@ -397,20 +395,18 @@ def update_balance(user_id: int, change: int) -> int:
 def update_bank(user_id: int, change: int) -> int:
     conn = _conn()
     cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO economy (user_id, balance, bank, debt)
+        VALUES (?, '100', ?, '0')
+        ON CONFLICT(user_id) DO UPDATE SET bank = CAST(CAST(bank AS INTEGER) + ? AS TEXT)
+        """,
+        (user_id, str(change), change),
+    )
+    conn.commit()
     cursor.execute("SELECT bank FROM economy WHERE user_id = ?", (user_id,))
     row = cursor.fetchone()
-    if row is None:
-        new_bank = change
-        cursor.execute(
-            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', ?, '0')",
-            (user_id, str(new_bank)),
-        )
-    else:
-        new_bank = _safe_int(row[0]) + change
-        cursor.execute(
-            "UPDATE economy SET bank = ? WHERE user_id = ?", (str(new_bank), user_id)
-        )
-    conn.commit()
+    new_bank = _safe_int(row[0]) if row else 0
     cursor.close()
     return new_bank
 
@@ -441,17 +437,18 @@ def set_debt(user_id: int, amount: int):
 def update_debt(user_id: int, change: int) -> int:
     conn = _conn()
     cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO economy (user_id, balance, bank, debt)
+        VALUES (?, '100', '0', ?)
+        ON CONFLICT(user_id) DO UPDATE SET debt = CAST(max(CAST(debt AS INTEGER) + ?, 0) AS TEXT)
+        """,
+        (user_id, str(max(0, change)), change),
+    )
+    conn.commit()
     cursor.execute("SELECT debt FROM economy WHERE user_id = ?", (user_id,))
     row = cursor.fetchone()
-    if row is None:
-        new_debt = max(0, change)
-        cursor.execute("INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', ?)", (user_id, str(new_debt)))
-    else:
-        new_debt = _safe_int(row[0]) + change
-        if new_debt < 0:
-            new_debt = 0
-        cursor.execute("UPDATE economy SET debt = ? WHERE user_id = ?", (str(new_debt), user_id))
-    conn.commit()
+    new_debt = _safe_int(row[0]) if row else 0
     cursor.close()
     return new_debt
 
@@ -799,20 +796,13 @@ def track_gamble_result(user_id: int, net_gain: int):
     conn = _conn()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT net FROM gamble_daily WHERE user_id = ? AND day = ?",
-        (user_id, today),
+        """
+        INSERT INTO gamble_daily (user_id, day, net, insurance_claimed)
+        VALUES (?, ?, ?, 0)
+        ON CONFLICT(user_id, day) DO UPDATE SET net = net + excluded.net
+        """,
+        (user_id, today, int(net_gain)),
     )
-    row = cursor.fetchone()
-    if row is None:
-        cursor.execute(
-            "INSERT INTO gamble_daily (user_id, day, net, insurance_claimed) VALUES (?, ?, ?, 0)",
-            (user_id, today, int(net_gain)),
-        )
-    else:
-        cursor.execute(
-            "UPDATE gamble_daily SET net = ? WHERE user_id = ? AND day = ?",
-            (row[0] + int(net_gain), user_id, today),
-        )
     conn.commit()
     cursor.close()
 

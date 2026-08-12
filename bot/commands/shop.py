@@ -312,6 +312,5 @@ def setup_shop(client: commands.Bot):
     @is_admin()
     @app_commands.describe(user="the user", item="item name", quantity="how many to remove")
     async def removeitem(ctx: commands.Context, user: discord.Member, item: str, quantity: int = 1):
-        for _ in range(quantity):
-            await asyncio.to_thread(db.remove_item, user.id, item.strip().lower())
+        await asyncio.to_thread(db.remove_item, user.id, item.strip().lower(), quantity)
         await ctx.reply(f"removed x{quantity} {item} from {user.mention}")
