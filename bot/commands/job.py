@@ -7,7 +7,6 @@ import bot.db as db
 from bot.commands import is_nightly, apply_income_tax
 from bot.commands.shop import take_cheat
 from datetime import datetime, timedelta
-from typing import Literal
 
 JOBS = {
     "janitor": {
@@ -65,6 +64,11 @@ JOBS = {
         "titles": ["Pickpocket", "Burglar", "Cat Burglar", "Master Thief", "Phantom"]
     }
 }
+
+JOB_CHOICES = [
+    app_commands.Choice(name=f"{info['emoji']} {job_name}", value=job_name)
+    for job_name, info in JOBS.items()
+]
 
 def get_job_title(job_name, level):
     titles = JOBS[job_name]["titles"]
@@ -643,7 +647,8 @@ def setup_job(client: commands.Bot):
 
     @job_group.command(name="apply", description="apply for a job")
     @app_commands.describe(job_name="the name of the job you want")
-    async def job_apply(ctx: commands.Context, job_name: Literal["janitor", "chef", "developer", "hacker", "miner", "thief"]):
+    @app_commands.choices(job_name=JOB_CHOICES)
+    async def job_apply(ctx: commands.Context, job_name: str):
         job_name = job_name.lower()
         if job_name not in JOBS:
             await ctx.reply(f"invalid job. use `/job list` to see available jobs.")
