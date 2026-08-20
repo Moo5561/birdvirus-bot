@@ -225,6 +225,7 @@ __marimo__/
 # published to github pages. it is untracked now; init_db() recreates it on boot.
 birdvirus.db
 birdvirus_nightly.db
+birdvirus.db.bak
 generated_media/
 test_*.py
 bot.log
