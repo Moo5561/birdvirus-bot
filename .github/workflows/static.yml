@@ -1,28 +1,25 @@
-# Simple workflow for deploying static content to GitHub Pages
+# Deploys the public site (site/ plus the birdvirus-cloud front-end) to GitHub Pages.
+#
+# This deliberately does NOT upload the whole repository. Doing that published the
+# bot source, .env.example, bot/banned_users.txt and the tracked sqlite database to
+# a public URL. Only the files staged into _site/ below are ever served.
 name: Deploy static content to Pages
 
 on:
-  # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
   deploy:
     environment:
       name: github-pages
@@ -31,13 +28,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Stage site
+        run: |
+          mkdir -p _site/birdvirus-cloud
+          # site/ becomes the root, so /index.html, /privacy.html, /terms.html stay put
+          cp site/index.html site/privacy.html site/terms.html site/pepsi.svg _site/
+          # the cloud front-end keeps its /birdvirus-cloud/ path. server.js is not
+          # copied: Pages is static only, so the /api/chat backend cannot run here.
+          cp birdvirus-cloud/index.html birdvirus-cloud/app.js birdvirus-cloud/styles.css _site/birdvirus-cloud/
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
-          path: '.'
+          path: '_site'
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5

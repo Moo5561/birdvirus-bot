@@ -7,6 +7,9 @@ Per-subsystem detail. `AGENTS.md` has the rules, `CLAUDE.md` has the architectur
 ```
 birdvirus-bot/
 ├── main.py                     # entry point, prefix logic, bot-to-bot invocation override
+├── setup.sh                    # venv + deps + playwright chromium
+├── requirements.txt
+├── version.txt                 # written by CI, don't hand-edit
 ├── bot/
 │   ├── config.py               # .env loading, OWNER_IDS, NIGHTLY_BOT_ID
 │   ├── db.py                   # synchronous sqlite3 — every table below
@@ -24,13 +27,21 @@ birdvirus-bot/
 │       ├── update.py           # /update, syntax_check()
 │       ├── blackjack.py        # BlackjackView, draw_card, calculate_hand
 │       ├── horserace.py        # HorseRaceView
-│       └── catrace.py          # CatRaceView
-├── mp3/                        # audio files
+│       ├── catrace.py          # CatRaceView
+│       ├── cars.py, crash.py, crypto.py, pet.py
+├── mp3/                        # audio assets, and the scratch dir for tts//play downloads
+├── site/                       # public github pages site: landing redirect, privacy, terms
 ├── birdvirus-cloud/            # separate node/express service, not imported by the bot
-├── birdvirus.db                # tracked in git, see CLAUDE.md
-├── version.txt                 # written by CI, don't hand-edit
-└── setup.sh
+├── docs/images/                # readme screenshots and artwork
+├── extras/                     # standalone odds and ends, not part of the bot
+└── .github/workflows/          # pages deploy + version.txt bump
 ```
+
+`birdvirus.db` is not in this tree on purpose: it is runtime state, gitignored, and
+created by `init_db()` on first boot.
+
+Everything under `mp3/` that matches `temp_*` or `tts_*` is scratch written at
+runtime and ignored by git — only the committed `.mp3` assets are real files.
 
 ## database tables
 
@@ -79,6 +90,7 @@ Most tickers drift synthetically through `drift_ticker()`. `RBLX` is flagged `"r
 - `queue_audio()` in `bot/commands/voice.py` accepts both local `mp3/` paths and remote URLs via yt-dlp.
 - volume is `PCMVolumeTransformer` at 0.60, except files named `badapple_max` at 1.0.
 - `voice_announcer` is a background task that plays a random bird sound in every connected vc every 15 seconds, at 80% chance.
+- on-demand sounds are `/vc bird` and `/vc fart`. `/vc droid` and every copy of `droid_sound.mp3` were removed.
 - `/vc join`/`/vc leave` also exist as bare prefix-only `join`/`leave` commands.
 
 ## properties

@@ -12,48 +12,6 @@ from bot.config import NIGHTLY_BOT_ID
 SNAPSHOT_FILE = "update_snapshot.txt"
 
 
-def _audit_droid(client):
-    """make sure /vc droid is alive in all the places it can get deleted from.
-    1) the audio file on disk
-    2) the command registrations (hybrid + prefix)
-    3) the stocks ticker (droid shares the sound)
-    if anything is missing, say so loudly."""
-    import bot.commands.stocks as stocks_mod
-    import bot.commands.voice as voice_mod
-
-    ok = True
-
-    audio_sources = [
-        "mp3/droid_sound.mp3",
-        "archived/droid_sound.mp3",
-        "readme-stuff/droid_sound.mp3",
-        "docs/droid_sound.mp3",
-        "birdvirus-cloud/droid_sound.mp3",
-        "mp3/droid.mp3",
-        "mp3/bird.mp3",
-    ]
-    src = next((s for s in audio_sources if os.path.exists(s)), None)
-    if src is None:
-        print("!!! /vc droid: no droid audio file found anywhere on disk", flush=True)
-        ok = False
-
-    command_names = {c.name for c in client.commands}
-    if "droid" not in command_names:
-        print("!!! /vc droid: droid command is not registered", flush=True)
-        ok = False
-
-    stock_tickers = [s["ticker"] for s in stocks_mod.STOCKS]
-    if "DROID" not in stock_tickers:
-        print("!!! droid: DROID ticker missing from stocks", flush=True)
-        ok = False
-
-    if not ok:
-        print(
-            "!!! AUDIT: /vc droid is broken somewhere. re-add the file, the command, and the ticker.",
-            flush=True,
-        )
-
-
 class UserBanned(commands.CheckFailure):
     pass
 
@@ -93,8 +51,6 @@ def setup(client: commands.Bot):
             print(f"synced {len(synced)} command(s) with discord")
         except Exception as e:
             print(f"error syncing command tree: {e}")
-
-        _audit_droid(client)
 
     @client.check
     async def globally_block_banned(ctx):

@@ -18,6 +18,8 @@ External requirements: `ffmpeg` on PATH (voice), `.env` with `KEY` (discord toke
 
 The static site (`birdvirus-cloud/`) is a separate Node/Express service: `npm start` in that directory, needs `OPENAI_API_KEY`. It is not imported by the bot and does not share its database.
 
+The public site lives in `site/` (landing redirect, privacy, terms). `.github/workflows/static.yml` stages `site/` plus the `birdvirus-cloud/` front-end into `_site/` and publishes only that — it must never go back to uploading the whole repository, which previously served the bot source and the database over http.
+
 ## architecture
 
 `main.py` builds a `BirdBot(AutoShardedBot)`, then calls `bot.events.setup(client)` followed by `bot.commands.setup(client)`. There are no discord.py Cogs — every module exports a `setup_<name>(client)` function that registers hybrid commands via closures, and `bot/commands/__init__.py:setup()` calls them in a fixed order.
@@ -52,7 +54,7 @@ Test for it with `is_nightly(ctx.bot)` from `bot/commands/__init__.py`. Anything
 
 New tables go in `init_db()` as `CREATE TABLE IF NOT EXISTS`. **There are no migrations**, so a new column on an existing table needs defensive `ALTER TABLE` / default handling — production databases already exist and will not be recreated.
 
-`birdvirus.db` is committed to the repo, which is why `/update` runs `git rm --cached birdvirus.db` before pulling.
+`birdvirus.db` is **not** tracked — it is runtime state and is gitignored. `/update` still runs `git rm --cached birdvirus.db` before pulling, which is now a no-op kept for hosts that pulled from an older commit where it was tracked.
 
 ### permissions
 

@@ -220,8 +220,22 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Birdvirus bot files
+# the database is runtime state, not source. it used to be tracked despite being
+# listed here, which meant a gitignore entry that did nothing and a live database
+# published to github pages. it is untracked now; init_db() recreates it on boot.
 birdvirus.db
+birdvirus_nightly.db
+birdvirus.db.bak
 generated_media/
-mp3/tts_*.mp3
 test_*.py
 bot.log
+
+# runtime artefacts written into mp3/ by the bot
+mp3/tts_*.mp3
+mp3/temp_*
+
+# written by /update, removed once the restart succeeds
+update_snapshot.txt
+
+# netscape-format cookie jar for yt-dlp
+cookies.txt
