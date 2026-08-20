@@ -16,7 +16,7 @@ be yourself, but be direct. no padding, no "great question", no summarizing back
 - **register your module.** there are no cogs. a new file in `bot/commands/` must export `setup_<name>(client)` and be imported + called in `bot/commands/__init__.py:setup()`, or it silently does nothing.
 - **guard for dms.** `default_allowed_contexts` in `main.py` enables dms, group dms, and user installs globally, so every new command lands there whether you meant it to or not. anything touching `ctx.guild` or `ctx.author.guild_permissions` needs an explicit `ctx.guild is None` check first.
 - **don't hand-edit `version.txt`.** a github action rewrites it on every push to `main`.
-- **don't commit** `.env`, `cookies.txt`, or `bot.log`. `birdvirus.db` is (unfortunately) tracked already — don't add churn to it on purpose.
+- **don't commit** `.env`, `cookies.txt`, `bot.log`, or `birdvirus.db`. all four are gitignored; the database was untracked deliberately, don't add it back.
 - **verify before you claim done:** `python -m py_compile main.py bot/*.py bot/commands/*.py`. there is no test suite; that check plus reading the diff is all you get.
 - **keep the diff scoped.** this codebase has a lot of near-duplicate game logic. don't opportunistically refactor unrelated files.
 

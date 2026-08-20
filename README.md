@@ -1,4 +1,4 @@
-![birdvirus bot](birdvirusbot.png)
+![birdvirus bot](docs/images/birdvirusbot.png)
 
 # birdvirus-bot
 
@@ -38,7 +38,7 @@ python main.py --host "your_name"
 
 ## self-hosting notes
 
-- the sqlite database is auto-created on first run. its path comes from `BOT_DB_PATH` and defaults to `birdvirus.db`.
+- the sqlite database is auto-created on first run. its path comes from `BOT_DB_PATH` and defaults to `birdvirus.db`. it is not tracked in git — a fresh clone starts with an empty economy.
 - audio files go in the `mp3/` directory.
 - the bot works out which identity it is from the token. the nightly/dev bot (id in `bot/config.py`) uses the `ht!` prefix, writes to a separate database, and bypasses economy checks.
 - bot owners are listed in `bot/config.py:OWNER_IDS`. additional admins can be added at runtime through the `admin_ids` config row.
@@ -55,7 +55,7 @@ all commands are hybrid — slash and prefix both work. prefix is `%` for the ma
 | stocks | `/stock market`, `/stock buy`, `/stock sell`, `/stock portfolio` |
 | shop | `/shop`, `/buy`, `/inv`, `/use` |
 | jobs | `/job list`, `/job info`, `/job apply`, `/job work`, `/job quit`, `/job beg` |
-| voice | `/vc join`, `/vc leave`, `/vc stop`, `/vc bird`, `/vc droid`, `/play`, `/stop`, `/bad apple` |
+| voice | `/vc join`, `/vc leave`, `/vc stop`, `/vc bird`, `/vc fart`, `/play`, `/stop`, `/bad apple` |
 | properties | `/property register`, `/property buy`, `/property remove`, `/property invite`, `/property kick` |
 | utility | `/ping`, `/gif`, `/version`, `/vote`, `/chat`, `/chat_reset`, `/say`, `/eatbomb`, `/tts`, `/numbairy`, `/internet search` |
 | admin | `/ban`, `/unban`, `/view say`, `/view logs`, `/clear saylist`, `/giveitem`, `/removeitem`, `/setshop`, `/setillegal` |
@@ -64,7 +64,7 @@ all commands are hybrid — slash and prefix both work. prefix is `%` for the ma
 
 ## contributing
 
-`AGENTS.md` has the rules, `CLAUDE.md` has the architecture, `DEVELOPMENT.md` has per-subsystem detail. there is no test suite — verify with:
+`AGENTS.md` has the rules, `CLAUDE.md` has the architecture, `DEVELOPMENT.md` has per-subsystem detail and the repo layout. there is no test suite — verify with:
 
 ```bash
 python -m py_compile main.py bot/*.py bot/commands/*.py
