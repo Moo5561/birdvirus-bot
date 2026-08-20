@@ -2,7 +2,19 @@
 main() {
  echo "-- Birdvirus Bot --"
  echo -n " • Checking if files are up to date..."
+ # birdvirus.db stopped being tracked in the "reorganize repo" change. pulling that
+ # commit onto a host where it is still tracked deletes the live database from the
+ # working tree. untrack it first so the pull leaves the file alone, and keep a
+ # copy either way. safe to run forever: both commands no-op once it is untracked.
+ if [ -f birdvirus.db ]; then
+   cp -f birdvirus.db birdvirus.db.bak 2>/dev/null
+   git rm --cached --quiet birdvirus.db > /dev/null 2>&1
+ fi
  git pull --ff-only > /dev/null
+ if [ ! -f birdvirus.db ] && [ -f birdvirus.db.bak ]; then
+   mv birdvirus.db.bak birdvirus.db
+   echo -e "\r ! restored birdvirus.db after the update removed it            "
+ fi
  if [ $? -ne 0 ]; then
     echo -e "\r ✗ An error occurred in the update checker, ignoring"
  fi
