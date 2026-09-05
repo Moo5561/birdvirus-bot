@@ -227,6 +227,35 @@ def setup_voice(client: commands.Bot):
         except Exception as e:
             await ctx.reply(f"error queueing audio: {e}")
 
+    @vc_group.command(
+        name="droid", description="play a droid sound in the voice channel"
+    )
+    async def vc_droid(ctx: commands.Context):
+        if ctx.voice_client is None:
+            await ctx.reply("i'm not in a voice channel. use `/vc join` first")
+            return
+
+        if ctx.voice_client.is_playing():
+            await ctx.reply("i'm already playing something")
+            return
+
+        audio_file = "mp3/droid_sound.mp3"
+        if not os.path.exists(audio_file):
+            await ctx.reply("no droid audio file found on disk, sad")
+            return
+
+        try:
+            queue_audio(ctx.voice_client, audio_file)
+            coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, -1)
+            await asyncio.to_thread(db.update_house, 1)
+            await ctx.reply(
+                f"queued: `droid` -1 {coin_emoji} for the droid's upkeep (balance: {new_balance})",
+                ephemeral=True,
+            )
+        except Exception as e:
+            await ctx.reply(f"error queueing audio: {e}")
+
     @client.hybrid_command(
         name="stop", description="stop the audio playback and clear the queue"
     )
