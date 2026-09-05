@@ -191,6 +191,11 @@ async def apply_income_tax(ctx, user_id, amount):
     return tax
 
 
+async def credit_income(ctx, user_id, amount):
+    """Credit non-gambling income and income tax in one DB transaction."""
+    return await asyncio.to_thread(db.credit_income, user_id, amount, not is_nightly(ctx.bot))
+
+
 from .blackjack import setup_blackjack
 from .voice import setup_voice
 from .economy import setup_economy

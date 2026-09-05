@@ -4,7 +4,7 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
-from bot.commands import is_admin, is_nightly, game_lock, game_unlock, _s, claim_streak_bonus, track_gamble, is_dev, apply_income_tax
+from bot.commands import is_admin, is_nightly, game_lock, game_unlock, _s, claim_streak_bonus, track_gamble, is_dev, credit_income
 from bot.commands.blackjack import BlackjackView, draw_card
 from bot.commands.horserace import HorseRaceView
 from bot.commands.catrace import CatRaceView
@@ -949,8 +949,7 @@ def setup_economy(client: commands.Bot):
         success = random.random() < 0.90
         if success:
             amount = random.randint(1, 15)
-            tax = await apply_income_tax(ctx, ctx.author.id, amount)
-            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, amount)
+            new_balance, tax = await credit_income(ctx, ctx.author.id, amount)
 
             responses = [
                 f"some guy threw {amount} {coin_emoji} at you (balance: {new_balance})",
@@ -996,8 +995,7 @@ def setup_economy(client: commands.Bot):
         
         if caught["max"] > 0:
             amount = random.randint(caught["min"], caught["max"]) * fish_mult
-            tax = await apply_income_tax(ctx, ctx.author.id, amount)
-            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, amount)
+            new_balance, tax = await credit_income(ctx, ctx.author.id, amount)
             await ctx.reply(f"you cast your line and caught a {caught['emoji']} {caught['name']}! you sold it for {amount} {coin_emoji}" + (f" (tax: {tax} {coin_emoji})" if tax else "") + f" (balance: {new_balance})")
         else:
             await ctx.reply(f"you cast your line and caught a {caught['emoji']} {caught['name']}. it's worthless. better luck next time.")

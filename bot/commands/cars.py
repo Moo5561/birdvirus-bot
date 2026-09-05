@@ -5,7 +5,7 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
-from bot.commands import _s, apply_income_tax, is_nightly
+from bot.commands import _s, credit_income, is_nightly
 
 
 DRIVE_COOLDOWN = 1800
@@ -186,8 +186,7 @@ def setup_cars(client: commands.Bot):
         if owned["wear"] >= 70:
             gross = int(gross * 0.75)
 
-        tax = await apply_income_tax(ctx, ctx.author.id, gross)
-        new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, gross)
+        new_balance, tax = await credit_income(ctx, ctx.author.id, gross)
         updated = await asyncio.to_thread(db.record_car_drive, ctx.author.id, key, miles, wear_gain, gross, str(now))
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
 

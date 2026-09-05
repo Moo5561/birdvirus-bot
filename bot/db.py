@@ -407,6 +407,65 @@ def update_balance(user_id: int, change: int) -> int:
     return new_balance
 
 
+def credit_income(user_id: int, amount: int, taxable: bool = True) -> tuple[int, int]:
+    """Credit non-gambling income and income tax in one transaction."""
+    conn = _conn()
+    cursor = conn.cursor()
+    tax = 0
+    try:
+        if taxable and amount > 0:
+            row = cursor.execute(
+                "SELECT value FROM config WHERE key = 'income_tax_rate'"
+            ).fetchone()
+            try:
+                rate = int(row[0]) if row and row[0] is not None else 15
+            except (TypeError, ValueError):
+                rate = 15
+            if rate > 0:
+                tax = max(1, int(amount * rate / 100))
+
+        net = amount - tax
+        row = cursor.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        if row is None:
+            new_balance = 100 + net
+            cursor.execute(
+                "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, ?, '0', '0')",
+                (user_id, str(new_balance)),
+            )
+        else:
+            base = 0 if _is_corrupt(row[0]) else _safe_int(row[0])
+            new_balance = base + net
+            cursor.execute(
+                "UPDATE economy SET balance = ? WHERE user_id = ?",
+                (str(new_balance), user_id),
+            )
+
+        if tax:
+            cursor.execute(
+                "INSERT INTO config (key, value) VALUES ('house_wallet', ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + CAST(? AS INTEGER)",
+                (str(tax), str(tax)),
+            )
+            cursor.execute(
+                "INSERT INTO config (key, value) VALUES ('income_tax_collected', ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + CAST(? AS INTEGER)",
+                (str(tax), str(tax)),
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+
+    if tax:
+        _invalidate_config("house_wallet")
+        _invalidate_config("income_tax_collected")
+    return new_balance, tax
+
+
 def update_bank(user_id: int, change: int) -> int:
     conn = _conn()
     cursor = conn.cursor()

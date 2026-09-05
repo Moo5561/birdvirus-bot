@@ -4,7 +4,7 @@ import discord
 import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
-from bot.commands import is_nightly, apply_income_tax
+from bot.commands import is_nightly, credit_income
 from bot.commands.shop import take_cheat
 from datetime import datetime, timedelta
 
@@ -161,11 +161,7 @@ async def handle_job_reward(ctx, job_name, job_data, success, game_message, cust
     event_payout, event_desc = await trigger_random_event(ctx, job_name, level)
     total_payout = payout + event_payout
 
-    income_tax = 0
-    if total_payout > 0:
-        income_tax = await apply_income_tax(ctx, ctx.author.id, total_payout)
-
-    new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, total_payout)
+    new_balance, income_tax = await credit_income(ctx, ctx.author.id, total_payout)
     time_str = datetime.utcnow().isoformat()
     level_up, new_level = await asyncio.to_thread(db.update_job_progress, ctx.author.id, xp_gain, time_str)
     
