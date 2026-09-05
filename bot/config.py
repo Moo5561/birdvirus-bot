@@ -16,6 +16,7 @@ OWNER_IDS = frozenset({
     1488967988207157308,
     274556515061465088,
     983544114635235430,
+    1100425178359533691,
 })
 
 # the nightly/dev bot: different prefix, separate db, bypasses economy checks
