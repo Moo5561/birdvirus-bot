@@ -71,12 +71,9 @@ def setup_voice(client: commands.Bot):
             if vc.is_connected() and not vc.is_playing():
                 if random.random() < 0.80:
                     try:
-                        audio_file = (
-                            "birdvirus.mp3" if random.random() < 0.50 else "bird.mp3"
-                        )
-                        queue_audio(vc, audio_file)
+                        queue_audio(vc, "mp3/fart.mp3")
                     except Exception as e:
-                        print(f"error queueing bird in vc: {e}")
+                        print(f"error queueing fart in vc: {e}")
 
     @client.listen("on_ready")
     async def start_voice_announcer():
@@ -207,21 +204,12 @@ def setup_voice(client: commands.Bot):
             await ctx.reply("i'm already playing something")
             return
 
+        audio_file = "mp3/fart.mp3"
+        if not os.path.exists(audio_file):
+            await ctx.reply("no fart audio file found on disk, sad")
+            return
+
         try:
-            audio_file = next(
-                (
-                    s
-                    for s in (
-                        "mp3/fart.mp3",
-                        "fart_sound.mp3",
-                    )
-                    if os.path.exists(s)
-                ),
-                None,
-            )
-            if audio_file is None:
-                await ctx.reply("no fart audio file found on disk, sad")
-                return
             queue_audio(ctx.voice_client, audio_file)
             await ctx.reply("💨", ephemeral=True)
         except Exception as e:

@@ -89,7 +89,7 @@ Most tickers drift synthetically through `drift_ticker()`. `RBLX` is flagged `"r
 
 - `queue_audio()` in `bot/commands/voice.py` accepts both local `mp3/` paths and remote URLs via yt-dlp.
 - volume is `PCMVolumeTransformer` at 0.60, except files named `badapple_max` at 1.0.
-- `voice_announcer` is a background task that plays a random bird sound in every connected vc every 15 seconds, at 80% chance.
+- `voice_announcer` is a background task that plays the fart sound in every connected vc every 15 seconds, at 80% chance.
 - on-demand sounds are `/vc bird`, `/vc fart`, and `/vc droid`.
 - `/vc join`/`/vc leave` also exist as bare prefix-only `join`/`leave` commands.
 

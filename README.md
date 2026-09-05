@@ -10,7 +10,7 @@ the official discord bot for the birdvirus community. multipurpose economy, audi
 - **stock market** — ten tradeable tickers with live price drift and a matplotlib chart. one of them tracks the real roblox share price.
 - **shop** — buy items and consumables from a time-gated storefront, plus an illegal vendor that only shows up in a two-hour window.
 - **jobs** — 6 jobs (janitor, chef, developer, hacker, miner, thief), each with its own minigame, levels, xp, promotions, and random events.
-- **voice & audio** — queue system for local files and youtube (via yt-dlp). random bird sounds play on their own in vc. text-to-speech support.
+- **voice & audio** — queue system for local files and youtube (via yt-dlp). random fart sounds play on their own in vc. text-to-speech support.
 - **properties** — buy private threads or voice channels with custom roles, with an invite/kick system.
 - **ai chat** — `/chat` talks to you with per-channel context memory, plus `/internet search`.
 - **admin** — ban/unban, log viewing, economy and tax management, configurable coin emoji.
