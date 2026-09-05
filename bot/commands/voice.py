@@ -32,7 +32,7 @@ def cleanup_temp(source):
 
 
 def _play(vc, guild_id, source):
-    vol = 1.0 if "badapple_max" in source else 0.60
+    vol = 1.0 if ("badapple_max" in source or "fart" in source) else 0.60
     actual_source = source if (source.startswith("mp3/") or source.startswith("http")) else f"mp3/{source}"
     if source.startswith("mp3/temp_"):
         current_temp_sources[guild_id] = source
@@ -200,18 +200,21 @@ def setup_voice(client: commands.Bot):
             await ctx.reply("i'm not in a voice channel. use `/vc join` first")
             return
 
-        if ctx.voice_client.is_playing():
-            await ctx.reply("i'm already playing something")
-            return
-
         audio_file = "mp3/fart.mp3"
         if not os.path.exists(audio_file):
             await ctx.reply("no fart audio file found on disk, sad")
             return
 
         try:
+            guild_id = ctx.guild.id
+            if guild_id in audio_queues:
+                for src in audio_queues[guild_id]:
+                    cleanup_temp(src)
+                audio_queues[guild_id].clear()
+            if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
+                ctx.voice_client.stop()
             queue_audio(ctx.voice_client, audio_file)
-            await ctx.reply("💨", ephemeral=True)
+            await ctx.reply("queued fart", ephemeral=True)
         except Exception as e:
             await ctx.reply(f"error queueing audio: {e}")
 
