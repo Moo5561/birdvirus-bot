@@ -7,7 +7,7 @@ import bot.db as db
 import bot.bans as bans
 import os
 from bot.commands import is_admin, is_bot_dev, _is_configured_admin, _s
-from bot.commands.economy import _to_bet
+from bot.commands.economy import _to_bet, _to_nonnegative
 
 
 async def check_if_dev(user_id):
@@ -291,10 +291,7 @@ def setup_admin(client: commands.Bot):
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(user="the user whose balance to set", amount="the new balance amount")
     async def ec_set(ctx: commands.Context, user: discord.Member, amount: str):
-        amount = _to_bet(amount)
-        if amount < 0:
-            await ctx.reply("amount cannot be negative")
-            return
+        amount = _to_nonnegative(amount)
         await asyncio.to_thread(db.set_balance, user.id, amount)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         await ctx.reply(f"set {user.display_name}s holding balance to {amount} {coin_emoji}")
@@ -304,10 +301,7 @@ def setup_admin(client: commands.Bot):
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(user="the user whose bank balance to set", amount="the new bank balance amount")
     async def ec_setbank(ctx: commands.Context, user: discord.Member, amount: str):
-        amount = _to_bet(amount)
-        if amount < 0:
-            await ctx.reply("amount cannot be negative")
-            return
+        amount = _to_nonnegative(amount)
         await asyncio.to_thread(db.set_bank, user.id, amount)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         await ctx.reply(f"set {user.display_name}s bank balance to {amount} {coin_emoji}")
