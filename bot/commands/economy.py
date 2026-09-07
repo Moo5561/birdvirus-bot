@@ -40,6 +40,14 @@ def _to_nonnegative(val):
         raise commands.BadArgument("amount cannot be negative")
     return v
 
+
+def _to_integer(val):
+    """convert an admin-set money amount to an integer, including negatives."""
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        raise commands.BadArgument("amount must be a valid integer")
+
 async def get_balance_checked(ctx, user_id):
     if is_nightly(ctx.bot):
         return 999999999999999999999999999, 999999999999999999999999999, 0

@@ -7,7 +7,7 @@ import bot.db as db
 import bot.bans as bans
 import os
 from bot.commands import is_admin, is_bot_dev, _is_configured_admin, _s
-from bot.commands.economy import _to_bet, _to_nonnegative
+from bot.commands.economy import _to_bet, _to_integer, _to_nonnegative
 
 
 async def check_if_dev(user_id):
@@ -291,7 +291,7 @@ def setup_admin(client: commands.Bot):
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(user="the user whose balance to set", amount="the new balance amount")
     async def ec_set(ctx: commands.Context, user: discord.Member, amount: str):
-        amount = _to_nonnegative(amount)
+        amount = _to_integer(amount)
         await asyncio.to_thread(db.set_balance, user.id, amount)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         await ctx.reply(f"set {user.display_name}s holding balance to {amount} {coin_emoji}")
@@ -301,7 +301,7 @@ def setup_admin(client: commands.Bot):
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(user="the user whose bank balance to set", amount="the new bank balance amount")
     async def ec_setbank(ctx: commands.Context, user: discord.Member, amount: str):
-        amount = _to_nonnegative(amount)
+        amount = _to_integer(amount)
         await asyncio.to_thread(db.set_bank, user.id, amount)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         await ctx.reply(f"set {user.display_name}s bank balance to {amount} {coin_emoji}")
@@ -340,6 +340,16 @@ def setup_admin(client: commands.Bot):
             return
         await asyncio.to_thread(db.set_config, "income_tax_rate", str(percent))
         await ctx.reply(f"set income tax rate to {percent}% on jobs, fish, beg, and crypto cashouts")
+
+    @ec_debt_command := ec_group.command(name="debt", description="set a user's debt (admin only)")
+    @is_admin()
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(user="the user to put in debt", amount="the user's new debt amount")
+    async def ec_debt(ctx: commands.Context, user: discord.Member, amount: str):
+        amount = _to_nonnegative(amount)
+        await asyncio.to_thread(db.set_debt, user.id, amount)
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        await ctx.reply(f"set {user.display_name}s debt to {amount} {coin_emoji}")
 
     @ec_taxinfo_command := ec_group.command(name="taxinfo", description="view tax info (admin only)")
     @is_admin()
