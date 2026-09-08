@@ -650,6 +650,11 @@ def setup_economy(client: commands.Bot):
         
         embed = discord.Embed(title="birdvirus scanner", color=0x2f3136)
         embed.description = f"a flock of 5 birds appeared! some of them might have the birdvirus.\nuse the dropdown menu to inspect each bird's history, then guess how many are infected.\n\nbet: {bet} {coin_emoji}"
+        embed.add_field(
+            name="real-world note",
+            value="Bird flu is caused by avian influenza A viruses. It usually spreads between birds, not people; human infections are rare and are most often linked to close, unprotected contact with infected animals or contaminated environments.",
+            inline=False,
+        )
         
         view = BirdvirusGameView(ctx, bet, birds_data, infected_count, coin_emoji)
         view.message = await ctx.reply(embed=embed, view=view)
@@ -1061,6 +1066,30 @@ def setup_economy(client: commands.Bot):
         new_bal = await asyncio.to_thread(db.update_balance, ctx.author.id, amount)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         await ctx.reply(f"withdrew {amount} {coin_emoji} from your bank. your holding balance is now {new_bal} {coin_emoji}")
+    @client.hybrid_command(name="birdflu", description="learn a little about real-world bird flu")
+    async def birdflu(ctx: commands.Context):
+        embed = discord.Embed(
+            title="bird flu · quick facts",
+            description=(
+                "Bird flu, also called avian influenza, is caused by influenza A viruses that mainly affect birds. "
+                "These viruses usually spread between birds, not people. Human infections are rare and most often "
+                "follow close, unprotected contact with infected animals or contaminated environments."
+            ),
+            color=0x5b8c85,
+        )
+        embed.add_field(
+            name="if you may have been exposed",
+            value="Avoid handling sick or dead birds without proper protection and contact a healthcare provider or local health department if you develop symptoms after an exposure.",
+            inline=False,
+        )
+        embed.add_field(
+            name="learn more",
+            value="[CDC · About Bird Flu](https://www.cdc.gov/bird-flu/about/index.html)",
+            inline=False,
+        )
+        embed.set_footer(text="This is general information, not medical advice.")
+        await ctx.reply(embed=embed)
+
     @client.hybrid_command(name="balance", description="view coin balance")
     @app_commands.describe(user="the user whose balance you want to check")
     async def balance(ctx: commands.Context, user: discord.Member = None):
