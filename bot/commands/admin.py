@@ -319,7 +319,7 @@ def setup_admin(client: commands.Bot):
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         await ctx.reply(f"added {amount} {coin_emoji} to {user.display_name}s holding (new balance: {new_balance} {coin_emoji})")
 
-    @ec_taxrate_command := ec_group.command(name="taxrate", description="set the tax rate on gambling wins (admin only)")
+    @ec_taxrate_command := ec_group.command(name="taxrate", description="set the unified tax rate on all earnings (admin only)")
     @is_admin()
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(percent="tax rate as a percentage (0 to disable)")
@@ -328,9 +328,10 @@ def setup_admin(client: commands.Bot):
             await ctx.reply("tax rate must be between 0 and 100")
             return
         await asyncio.to_thread(db.set_config, "tax_rate", str(percent))
-        await ctx.reply(f"set tax rate to {percent}% on gambling winnings")
+        await asyncio.to_thread(db.set_config, "income_tax_rate", str(percent))
+        await ctx.reply(f"set the unified tax rate to {percent}% on gambling and income earnings")
 
-    @ec_incometax_command := ec_group.command(name="incometax", description="set the income tax rate on jobs, fish, beg, crypto cashouts (admin only)")
+    @ec_incometax_command := ec_group.command(name="incometax", description="set the unified tax rate on all earnings (admin only)")
     @is_admin()
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(percent="income tax rate as a percentage (0 to disable)")
@@ -338,8 +339,9 @@ def setup_admin(client: commands.Bot):
         if percent < 0 or percent > 100:
             await ctx.reply("tax rate must be between 0 and 100")
             return
+        await asyncio.to_thread(db.set_config, "tax_rate", str(percent))
         await asyncio.to_thread(db.set_config, "income_tax_rate", str(percent))
-        await ctx.reply(f"set income tax rate to {percent}% on jobs, fish, beg, and crypto cashouts")
+        await ctx.reply(f"set the unified tax rate to {percent}% on gambling and income earnings")
 
     @ec_debt_command := ec_group.command(name="debt", description="set a user's debt (admin only)")
     @is_admin()

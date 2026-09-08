@@ -57,7 +57,7 @@ async def get_balance_checked(ctx, user_id):
 async def apply_tax(ctx, user_id, net_gain):
     if net_gain <= 0:
         return 0
-    tax_rate_str = await asyncio.to_thread(db.get_config, "tax_rate", "0")
+    tax_rate_str = await asyncio.to_thread(db.get_config, "income_tax_rate", "15")
     tax_rate = int(tax_rate_str)
     if tax_rate <= 0:
         return 0
