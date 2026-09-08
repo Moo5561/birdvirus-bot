@@ -1091,8 +1091,8 @@ def setup_economy(client: commands.Bot):
         await ctx.reply(embed=embed)
 
     @client.hybrid_command(name="balance", description="view coin balance")
-    @app_commands.describe(user="the user whose balance you want to check")
-    async def balance(ctx: commands.Context, user: discord.Member = None):
+    @app_commands.describe(user="the user whose balance you want to check", full="show exact numbers instead of shortened values")
+    async def balance(ctx: commands.Context, user: discord.Member = None, full: bool = False):
         target = user or ctx.author
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         bal, bank, debt = await get_balance_checked(ctx, target.id)
@@ -1102,9 +1102,10 @@ def setup_economy(client: commands.Bot):
             color=0x3498db
         )
         
-        debt_line = f"\n**Debt: **💳`{_s(debt)}`" if debt > 0 else ""
+        format_amount = str if full else _s
+        debt_line = f"\n**Debt: **💳`{format_amount(debt)}`" if debt > 0 else ""
         net = bal + bank - debt
-        embed.description = f"**Net Worth: **{coin_emoji} `{_s(net)}`\n\n**Holding: **💰`{_s(bal)}`\n**Bank: **🏦`{_s(bank)}`{debt_line}\n\n-# birdvirus coin in the bank earn interest!"
+        embed.description = f"**Net Worth: **{coin_emoji} `{format_amount(net)}`\n\n**Holding: **💰`{format_amount(bal)}`\n**Bank: **🏦`{format_amount(bank)}`{debt_line}\n\n-# birdvirus coin in the bank earn interest!"
         
         if target.display_avatar:
             embed.set_thumbnail(url=target.display_avatar.url)
