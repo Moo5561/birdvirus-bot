@@ -1066,6 +1066,65 @@ def setup_economy(client: commands.Bot):
         new_bal = await asyncio.to_thread(db.update_balance, ctx.author.id, amount)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         await ctx.reply(f"withdrew {amount} {coin_emoji} from your bank. your holding balance is now {new_bal} {coin_emoji}")
+
+    @client.hybrid_command(name="pay", description="send holding coins to another user")
+    @app_commands.describe(user="the user to pay", amount="how many coins to send")
+    async def pay(ctx: commands.Context, user: discord.Member, amount: str):
+        if user.bot:
+            await ctx.reply("you can't pay a bot")
+            return
+        if user.id == ctx.author.id:
+            await ctx.reply("you can't pay yourself")
+            return
+
+        amount = _to_bet(amount)
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        if is_nightly(ctx.bot):
+            await ctx.reply(f"sent {amount} {coin_emoji} to {user.mention} (nightly mode; no real balance changed)")
+            return
+
+        success, new_balance, _ = await asyncio.to_thread(
+            db.transfer_balance, ctx.author.id, user.id, amount
+        )
+        if not success:
+            current_balance, _, _ = await get_balance_checked(ctx, ctx.author.id)
+            await ctx.reply(
+                f"you don't have enough holding coins to send that (holding: {current_balance} {coin_emoji})"
+            )
+            return
+
+        await ctx.reply(
+            f"sent {amount} {coin_emoji} to {user.mention}. your holding balance is now {new_balance} {coin_emoji}"
+        )
+
+    @client.hybrid_command(name="networth", description="view a player's complete economic profile")
+    @app_commands.describe(user="whose net worth to view")
+    async def networth(ctx: commands.Context, user: discord.Member = None):
+        target = user or ctx.author
+        balance, bank, debt = await get_balance_checked(ctx, target.id)
+        net = balance + bank - debt
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+
+        all_users = await asyncio.to_thread(db.get_all_balances)
+        ranked = sorted(all_users, key=lambda row: row["balance"] + row["bank"] - row["debt"], reverse=True)
+        rank = next((index for index, row in enumerate(ranked, start=1) if row["user_id"] == target.id), None)
+
+        embed = discord.Embed(title=f"Economic profile · {target.display_name}", color=0x2ecc71)
+        embed.set_thumbnail(url=target.display_avatar.url)
+        embed.add_field(name="Net worth", value=f"{_s(net)} {coin_emoji}", inline=False)
+        embed.add_field(name="Holding", value=f"{_s(balance)} {coin_emoji}")
+        embed.add_field(name="Bank", value=f"{_s(bank)} {coin_emoji}")
+        embed.add_field(name="Debt", value=f"{_s(debt)} {coin_emoji}")
+        if rank is not None:
+            embed.set_footer(text=f"economy rank #{rank} of {len(ranked)}")
+        await ctx.reply(embed=embed)
+
+    @client.hybrid_command(name="daily", description="claim your daily gambling streak bonus")
+    async def daily(ctx: commands.Context):
+        claimed = await claim_streak_bonus(ctx)
+        if not claimed:
+            await ctx.reply("your daily streak bonus is already claimed, or no bonus is available yet")
+
     @client.hybrid_command(name="birdflu", description="learn a little about real-world bird flu")
     async def birdflu(ctx: commands.Context):
         embed = discord.Embed(

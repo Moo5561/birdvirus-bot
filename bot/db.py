@@ -407,6 +407,53 @@ def update_balance(user_id: int, change: int) -> int:
     return new_balance
 
 
+def transfer_balance(sender_id: int, recipient_id: int, amount: int) -> tuple[bool, int, int]:
+    """Atomically transfer holding coins between two users.
+
+    Returns ``(success, sender_balance, recipient_balance)``.  The caller is
+    responsible for validating the amount and rejecting self-transfers.
+    """
+    conn = _conn()
+    cursor = conn.cursor()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', '0') ON CONFLICT(user_id) DO NOTHING",
+            (sender_id,),
+        )
+        cursor.execute(
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', '0') ON CONFLICT(user_id) DO NOTHING",
+            (recipient_id,),
+        )
+        rows = cursor.execute(
+            "SELECT user_id, balance FROM economy WHERE user_id IN (?, ?)",
+            (sender_id, recipient_id),
+        ).fetchall()
+        balances = {row[0]: _safe_int(row[1]) for row in rows}
+        sender_balance = balances.get(sender_id, 0)
+        recipient_balance = balances.get(recipient_id, 0)
+
+        if amount <= 0 or sender_balance < amount:
+            conn.rollback()
+            return False, sender_balance, recipient_balance
+
+        cursor.execute(
+            "UPDATE economy SET balance = CAST(CAST(balance AS INTEGER) - ? AS TEXT) WHERE user_id = ?",
+            (amount, sender_id),
+        )
+        cursor.execute(
+            "UPDATE economy SET balance = CAST(CAST(balance AS INTEGER) + ? AS TEXT) WHERE user_id = ?",
+            (amount, recipient_id),
+        )
+        conn.commit()
+        return True, sender_balance - amount, recipient_balance + amount
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+
+
 def credit_income(user_id: int, amount: int, taxable: bool = True) -> tuple[int, int]:
     """Credit non-gambling income and income tax in one transaction."""
     conn = _conn()
