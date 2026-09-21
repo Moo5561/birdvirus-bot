@@ -1097,6 +1097,45 @@ def setup_economy(client: commands.Bot):
             f"sent {amount} {coin_emoji} to {user.mention}. your holding balance is now {new_balance} {coin_emoji}"
         )
 
+    @client.hybrid_command(name="rob", description="try to steal holding coins from another user")
+    @app_commands.describe(user="the user to rob")
+    @commands.cooldown(1, 120, commands.BucketType.user)
+    async def rob(ctx: commands.Context, user: discord.Member):
+        if user.bot:
+            await ctx.reply("you can't rob a bot")
+            return
+        if user.id == ctx.author.id:
+            await ctx.reply("you can't rob yourself")
+            return
+
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        target_balance, _, _ = await get_balance_checked(ctx, user.id)
+        if target_balance <= 0:
+            await ctx.reply(f"{user.mention} has no holding coins worth stealing")
+            return
+
+        if is_nightly(ctx.bot):
+            await ctx.reply(f"you tried to rob {user.mention} (nightly mode; no real balance changed)")
+            return
+
+        if random.random() >= 0.45:
+            await ctx.reply(f"you got caught trying to rob {user.mention} and got nothing")
+            return
+
+        minimum = max(1, target_balance // 10)
+        maximum = max(minimum, min(5000, target_balance // 3))
+        amount = random.randint(minimum, maximum)
+        success, new_balance, _ = await asyncio.to_thread(
+            db.transfer_balance, user.id, ctx.author.id, amount
+        )
+        if not success:
+            await ctx.reply(f"{user.mention} moved their coins before you could grab them")
+            return
+
+        await ctx.reply(
+            f"🕵️ you robbed {amount} {coin_emoji} from {user.mention}! your holding balance is now {new_balance} {coin_emoji}"
+        )
+
     @client.hybrid_command(name="networth", description="view a player's complete economic profile")
     @app_commands.describe(user="whose net worth to view")
     async def networth(ctx: commands.Context, user: discord.Member = None):
