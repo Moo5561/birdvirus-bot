@@ -9,6 +9,7 @@ apikey = os.getenv('API_KEY')
 
 # bot owners — always pass is_admin/is_bot_dev and can force the bot out of a vc
 OWNER_IDS = frozenset({
+    1532874259901186213,
     1048423590623727686,
     1278489064210956378,
     1421940246492352612,
