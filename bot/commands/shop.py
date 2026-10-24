@@ -195,18 +195,17 @@ def setup_shop(client: commands.Bot):
                 return
 
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-
-        bal = await get_balance_safe(ctx, ctx.author.id)
-        if bal < item_data["price"] and not is_nightly(ctx.bot):
-            await ctx.reply(f"you need {item_data['price']} {coin_emoji} for that. you have {bal} {coin_emoji}")
+        price = 0 if is_nightly(ctx.bot) else item_data["price"]
+        purchased, balance = await asyncio.to_thread(
+            db.purchase_item, ctx.author.id, item_key, price
+        )
+        if not purchased:
+            await ctx.reply(f"you need {item_data['price']} {coin_emoji} for that. you have {balance} {coin_emoji}")
             return
-
-        await asyncio.to_thread(db.update_balance, ctx.author.id, -item_data["price"])
-        await asyncio.to_thread(db.add_item, ctx.author.id, item_key)
         if item_data in ILLEGAL_ITEMS:
             _record_illegal_buy(ctx.author.id)
 
-        await ctx.reply(f"you bought **{item_data['emoji']} {item_key.title()}** for {item_data['price']} {coin_emoji}. use `%use {item_key}` to activate it!")
+        await ctx.reply(f"you bought **{item_data['emoji']} {item_key.title()}** for {price} {coin_emoji}. use `%use {item_key}` to activate it!")
 
     @buy.error
     async def buy_error(ctx: commands.Context, error):
@@ -246,10 +245,6 @@ def setup_shop(client: commands.Bot):
             await ctx.reply(f"can't use {item_key} here")
             return
 
-        has = await asyncio.to_thread(db.has_item, ctx.author.id, item_key)
-        if not has:
-            await ctx.reply(f"you don't have {item_key}. check `%inv`")
-            return
 
         user_id = ctx.author.id
         cheat, response = effect
@@ -259,7 +254,10 @@ def setup_shop(client: commands.Bot):
             return
 
         # only burn the item once we know it will actually do something
-        await asyncio.to_thread(db.remove_item, ctx.author.id, item_key)
+        consumed = await asyncio.to_thread(db.remove_item, ctx.author.id, item_key)
+        if not consumed:
+            await ctx.reply(f"you don't have {item_key}. check `%inv`")
+            return
         ACTIVE_CHEATS[user_id] = dict(cheat)
         await ctx.reply(response)
 

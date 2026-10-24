@@ -9,10 +9,11 @@ This file covers how the bot is wired together and the places where it bites. Re
 ```bash
 ./setup.sh                      # venv + pip install -r requirements.txt + playwright install chromium
 python main.py --host "name"    # run the bot; --host is required, it only sets the discord activity text
-python -m py_compile main.py bot/*.py bot/commands/*.py   # the only "test" this repo has
+python -m py_compile main.py bot/*.py bot/commands/*.py
+python -m unittest discover -s tests -p "*_test.py"
 ```
 
-There is no test suite, linter, or formatter. `bot/commands/update.py:syntax_check()` runs that same `py_compile` sweep over `bot/**/*.py` before the bot restarts itself, so it is also the gate on self-updates.
+There is a small standard-library regression suite for the synchronous database transaction layer. `.github/workflows/checks.yml` runs it and a complete Python compile sweep on pushes and pull requests. `bot/commands/update.py:syntax_check()` still runs its own `py_compile` sweep over `bot/**/*.py` before the bot restarts itself.
 
 External requirements: `ffmpeg` on PATH (voice), `.env` with `KEY` (discord token) and `API_KEY` (gemini), optional `cookies.txt` for yt-dlp.
 
