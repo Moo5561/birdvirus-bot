@@ -29,12 +29,13 @@ birdvirus-bot/
 │       ├── horserace.py        # HorseRaceView
 │       ├── catrace.py          # CatRaceView
 │       ├── cars.py, crash.py, crypto.py, pet.py
+├── tests/                      # standard-library DB transaction regressions
 ├── mp3/                        # audio assets, and the scratch dir for tts//play downloads
 ├── site/                       # public github pages site: landing redirect, privacy, terms
 ├── birdvirus-cloud/            # separate node/express service, not imported by the bot
 ├── docs/images/                # readme screenshots and artwork
 ├── extras/                     # standalone odds and ends, not part of the bot
-└── .github/workflows/          # pages deploy + version.txt bump
+└── .github/workflows/          # checks, pages deploy, version.txt bump
 ```
 
 `birdvirus.db` is not in this tree on purpose: it is runtime state, gitignored, and
@@ -42,6 +43,8 @@ created by `init_db()` on first boot.
 
 Everything under `mp3/` that matches `temp_*` or `tts_*` is scratch written at
 runtime and ignored by git — only the committed `.mp3` assets are real files.
+
+`python -m unittest discover -s tests -p "*_test.py"` exercises the transaction boundaries that protect balances, inventory, banking, stocks, claims, cars, and job fees. the suite uses a temporary sqlite database and does not need discord credentials or third-party packages.
 
 ## database tables
 

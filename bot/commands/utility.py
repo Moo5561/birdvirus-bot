@@ -487,6 +487,9 @@ def setup_utility(client: commands.Bot):
         if user.id == client.user.id:
             await ctx.reply("nice try. i'm unkillable")
             return
+        if user.id == ctx.author.id:
+            await ctx.reply("you can't murder yourself for profit")
+            return
 
         victim = user.display_name
         methods = [
@@ -502,16 +505,20 @@ def setup_utility(client: commands.Bot):
 
         victim_bal, _, _ = await asyncio.to_thread(db.get_balances, user.id)
         stolen = 0
+        victim_remaining = victim_bal
         if victim_bal > 0 and not is_nightly(ctx.bot):
             stolen = max(1, int(victim_bal * random.uniform(0.05, 0.25)))
             stolen = min(stolen, victim_bal)
-            await asyncio.to_thread(db.update_balance, user.id, -stolen)
-            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, stolen)
+            moved, victim_remaining, _ = await asyncio.to_thread(
+                db.transfer_balance, user.id, ctx.author.id, stolen
+            )
+            if not moved:
+                stolen = 0
 
         loot_text = (
-            f" (+{stolen} {coin_emoji} loot, {victim_bal - stolen} left on the corpse)"
+            f" (+{stolen} {coin_emoji} loot, {victim_remaining} left on the corpse)"
             if stolen
-            else f" (they were broke, no loot found)"
+            else " (they were broke, no loot found)"
         )
         await ctx.reply(f"**{random.choice(methods)}.** 💀{loot_text}")
 

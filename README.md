@@ -64,8 +64,11 @@ all commands are hybrid — slash and prefix both work. prefix is `%` for the ma
 
 ## contributing
 
-`AGENTS.md` has the rules, `CLAUDE.md` has the architecture, `DEVELOPMENT.md` has per-subsystem detail and the repo layout. there is no test suite — verify with:
+`AGENTS.md` has the rules, `CLAUDE.md` has the architecture, and `DEVELOPMENT.md` has per-subsystem detail. verify syntax and the database transaction regressions with:
 
 ```bash
 python -m py_compile main.py bot/*.py bot/commands/*.py
+python -m unittest discover -s tests -p "*_test.py"
 ```
+
+github actions runs both checks on every push and pull request.

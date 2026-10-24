@@ -867,15 +867,15 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("nightly bot doesn't need insurance")
             return
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        refund, eligible, claimed = await asyncio.to_thread(db.claim_insurance, ctx.author.id)
+        refund, eligible, claimed, new_balance = await asyncio.to_thread(
+            db.claim_insurance, ctx.author.id
+        )
         if claimed:
-            await ctx.reply(f"you already claimed today's insurance. come back tomorrow 📉")
+            await ctx.reply("you already claimed today's insurance. come back tomorrow 📉")
             return
         if refund <= 0:
-            await ctx.reply(f"no net gambling losses to insure today yet. lose some more then try again 😏")
+            await ctx.reply("no net gambling losses to insure today yet. lose some more then try again 😏")
             return
-        new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, refund)
-        await asyncio.to_thread(db.update_house, -refund)
         await ctx.reply(f"🛡️ insurance payout! you lost {eligible} {coin_emoji} net today, refunded {refund} {coin_emoji} (10%, capped at 500). balance: {new_balance}")
 
     @pure_house_command := pure_group.command(name="house", description="check the birdvirus house wallet balance")
@@ -898,24 +898,23 @@ def setup_economy(client: commands.Bot):
     @is_dev()
     async def pure_houseclaim(ctx: commands.Context, amount: str = None):
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        house = await asyncio.to_thread(db.get_house)
-        if house <= 0:
-            await ctx.reply("nothing to claim, the house is broke or in the hole right now 😔")
-            return
-        if amount and amount.lower() == "all":
-            claim = house
-        elif amount:
+        requested = None
+        if amount and amount.lower() != "all":
             try:
-                claim = min(int(amount), house)
+                requested = int(amount)
             except ValueError:
                 await ctx.reply("amount must be a number or 'all'")
                 return
-        else:
-            claim = house
+            if requested <= 0:
+                await ctx.reply("amount must be greater than zero")
+                return
+
+        claim, new_balance, _ = await asyncio.to_thread(
+            db.claim_house, ctx.author.id, requested
+        )
         if claim <= 0:
+            await ctx.reply("nothing to claim, the house is broke or in the hole right now 😔")
             return
-        await asyncio.to_thread(db.update_house, -claim)
-        new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, claim)
         await ctx.reply(f"🏦 claimed {claim} {coin_emoji} from the house. your balance: {new_balance} {coin_emoji}")
 
     @pure_bailout_command := pure_group.command(name="bailout", description="dev-only: inject or reset the house wallet")
@@ -1039,13 +1038,15 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("amount must be greater than zero")
             return
             
-        bal, _, _ = await get_balance_checked(ctx, ctx.author.id)
-        if bal < amount and not is_nightly(ctx.bot):
-            await ctx.reply(f"you don't have enough coins in your holding (holding: {bal})")
+        if is_nightly(ctx.bot):
+            await ctx.reply("deposit skipped in nightly mode; no real balance changed")
             return
-            
-        await asyncio.to_thread(db.update_balance, ctx.author.id, -amount)
-        new_bank = await asyncio.to_thread(db.update_bank, ctx.author.id, amount)
+        success, balance, new_bank = await asyncio.to_thread(
+            db.move_account_funds, ctx.author.id, amount, to_bank=True
+        )
+        if not success:
+            await ctx.reply(f"you don't have enough coins in your holding (holding: {balance})")
+            return
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         await ctx.reply(f"deposited {amount} {coin_emoji} into your bank. your bank balance is now {new_bank} {coin_emoji}")
 
@@ -1057,13 +1058,15 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("amount must be greater than zero")
             return
             
-        _, bank, _ = await get_balance_checked(ctx, ctx.author.id)
-        if bank < amount and not is_nightly(ctx.bot):
+        if is_nightly(ctx.bot):
+            await ctx.reply("withdrawal skipped in nightly mode; no real balance changed")
+            return
+        success, new_bal, bank = await asyncio.to_thread(
+            db.move_account_funds, ctx.author.id, amount, to_bank=False
+        )
+        if not success:
             await ctx.reply(f"you don't have enough coins in your bank (bank: {bank})")
             return
-            
-        await asyncio.to_thread(db.update_bank, ctx.author.id, -amount)
-        new_bal = await asyncio.to_thread(db.update_balance, ctx.author.id, amount)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         await ctx.reply(f"withdrew {amount} {coin_emoji} from your bank. your holding balance is now {new_bal} {coin_emoji}")
 
@@ -1227,8 +1230,9 @@ def setup_economy(client: commands.Bot):
         interest = int(amount * 0.1)
         total_debt = amount + interest
 
-        await asyncio.to_thread(db.update_balance, ctx.author.id, amount)
-        new_debt = await asyncio.to_thread(db.update_debt, ctx.author.id, total_debt)
+        _, new_debt = await asyncio.to_thread(
+            db.take_loan, ctx.author.id, amount, total_debt
+        )
 
         await ctx.reply(f"you took a loan of {amount} {coin_emoji} (10% interest = {interest} {coin_emoji}). total debt: {new_debt} {coin_emoji}")
 
@@ -1241,18 +1245,18 @@ def setup_economy(client: commands.Bot):
             await ctx.reply("amount must be greater than zero")
             return
 
-        bal, _, debt = await get_balance_checked(ctx, ctx.author.id)
-        if debt <= 0:
-            await ctx.reply("you have no debt")
+        if is_nightly(ctx.bot):
+            await ctx.reply("nightly bot has no real debt to repay")
             return
-
-        if bal < amount:
-            await ctx.reply(f"you don't have enough coins in your holding (holding: {bal}, debt: {debt})")
+        success, actual, bal, new_debt = await asyncio.to_thread(
+            db.repay_debt, ctx.author.id, amount
+        )
+        if not success:
+            if new_debt <= 0:
+                await ctx.reply("you have no debt")
+            else:
+                await ctx.reply(f"you don't have enough coins in your holding (holding: {bal}, debt: {new_debt})")
             return
-
-        actual = min(amount, debt)
-        await asyncio.to_thread(db.update_balance, ctx.author.id, -actual)
-        new_debt = await asyncio.to_thread(db.update_debt, ctx.author.id, -actual)
 
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         await ctx.reply(f"you repaid {actual} {coin_emoji} of your debt. remaining debt: {new_debt} {coin_emoji}")

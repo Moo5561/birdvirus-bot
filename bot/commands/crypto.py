@@ -116,24 +116,23 @@ def setup_crypto(client: commands.Bot):
         if is_nightly(ctx.bot):
             cost = 0
 
-        bal = await asyncio.to_thread(db.get_balance, ctx.author.id)
-        if not is_nightly(ctx.bot) and bal < cost:
+        status, balance = await asyncio.to_thread(
+            db.upgrade_crypto_rig,
+            ctx.author.id,
+            wallet["rig_level"],
+            target,
+            cost,
+        )
+        if status == "funds":
             await _report(
                 ctx,
                 f"upgrade to level {target} costs **{_s(cost)} coins** "
-                f"(balance: {_s(bal)}) — mine regular coins first. ",
+                f"(balance: {_s(balance)}) — mine regular coins first. ",
             )
             return
-
-        await asyncio.to_thread(db.update_balance, ctx.author.id, -cost)
-        await asyncio.to_thread(
-            db.set_crypto_wallet,
-            ctx.author.id,
-            wallet["balance"],
-            target,
-            wallet["mined_total"],
-            wallet["last_mine"],
-        )
+        if status == "changed":
+            await _report(ctx, "your rig changed while upgrading. check `/wallet` and try again. ")
+            return
         await _report(
             ctx,
             f"rig upgraded to **level {target}** ({_s(cost)} coins spent). "
