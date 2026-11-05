@@ -7,7 +7,7 @@ import discord.ext.commands as commands
 from discord.ext import tasks
 from discord import app_commands
 import bot.db as db
-from bot.commands import audio_queues, voice_joiners
+from bot.commands import audio_queues, voice_joiners, is_nightly
 from bot.config import OWNER_IDS
 
 AUDIO_EXTS = (".mp3", ".wav", ".ogg", ".m4a", ".aac")
@@ -235,16 +235,24 @@ def setup_voice(client: commands.Bot):
             await ctx.reply("no droid audio file found on disk, sad")
             return
 
+        cost = 0 if is_nightly(ctx.bot) else 1
+        charged, new_balance = await asyncio.to_thread(
+            db.transfer_to_house, ctx.author.id, cost
+        )
+        if not charged:
+            coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+            await ctx.reply(f"you need 1 {coin_emoji} for the droid's upkeep (balance: {new_balance})")
+            return
         try:
             queue_audio(ctx.voice_client, audio_file)
             coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, -1)
-            await asyncio.to_thread(db.update_house, 1)
             await ctx.reply(
-                f"queued: `droid` -1 {coin_emoji} for the droid's upkeep (balance: {new_balance})",
+                f"queued: `droid` -{cost} {coin_emoji} for the droid's upkeep (balance: {new_balance})",
                 ephemeral=True,
             )
         except Exception as e:
+            if cost:
+                await asyncio.to_thread(db.transfer_to_house, ctx.author.id, -cost)
             await ctx.reply(f"error queueing audio: {e}")
 
     @client.hybrid_command(
@@ -367,24 +375,25 @@ def setup_voice(client: commands.Bot):
             await ctx.reply("i'm not in a voice channel. use `/vc join` first")
             return
 
-        cost = 1000 if max_volume else 60
-        balance = await asyncio.to_thread(db.get_balance, ctx.author.id)
-        if balance < cost:
+        cost = 0 if is_nightly(ctx.bot) else (1000 if max_volume else 60)
+        charged, new_balance = await asyncio.to_thread(
+            db.transfer_to_house, ctx.author.id, cost
+        )
+        if not charged:
             coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
             await ctx.reply(
-                f"you don't have enough coins. this costs {cost} {coin_emoji} (your balance: {balance})"
+                f"you don't have enough coins. this costs {cost} {coin_emoji} (your balance: {new_balance})"
             )
             return
 
         try:
             source_file = "badapple_max.mp3" if max_volume else "badapple.mp3"
             queue_audio(ctx.voice_client, source_file)
-            new_balance = await asyncio.to_thread(
-                db.update_balance, ctx.author.id, -cost
-            )
             coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
             await ctx.reply(
                 f"queued bad apple 🍎 ({'100%' if max_volume else '60%'} volume). deducted {cost} {coin_emoji} (balance: {new_balance})"
             )
         except Exception as e:
+            if cost:
+                await asyncio.to_thread(db.transfer_to_house, ctx.author.id, -cost)
             await ctx.reply(f"error playing audio: {e}")

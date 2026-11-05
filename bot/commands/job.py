@@ -651,17 +651,16 @@ def setup_job(client: commands.Bot):
             return
             
         req_level = JOBS[job_name]["req_level"]
-        fee = req_level * 500
-        
+        fee = 0 if is_nightly(ctx.bot) else req_level * 500
+        accepted, balance = await asyncio.to_thread(
+            db.accept_job, ctx.author.id, job_name, fee
+        )
+        if not accepted:
+            await ctx.reply(f"you need {fee} coins to get the license for this job. you only have {balance}.")
+            return
         if fee > 0:
-            bal = await asyncio.to_thread(db.get_balance, ctx.author.id)
-            if bal < fee and not is_nightly(ctx.bot):
-                await ctx.reply(f"you need {fee} coins to get the license for this job. you only have {bal}.")
-                return
-            await asyncio.to_thread(db.update_balance, ctx.author.id, -fee)
             await ctx.reply(f"you paid {fee} coins for the {job_name} license.")
-            
-        await asyncio.to_thread(db.set_user_job, ctx.author.id, job_name)
+
         await ctx.reply(f"congratulations! you are now a {JOBS[job_name]['emoji']} {job_name.title()}. use `/job work` to start your shift.")
 
     @job_group.command(name="quit", description="quit your current job")

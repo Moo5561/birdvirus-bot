@@ -2,7 +2,7 @@ import json
 import sqlite3
 import os
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 DB_PATH = os.environ.get("BOT_DB_PATH", "birdvirus.db")
 
@@ -407,6 +407,42 @@ def update_balance(user_id: int, change: int) -> int:
     return new_balance
 
 
+def debit_balance(user_id: int, amount: int) -> tuple[bool, int]:
+    """Atomically spend holding coins without allowing an overdraft."""
+    if amount < 0:
+        raise ValueError("amount cannot be negative")
+
+    conn = _conn()
+    cursor = conn.cursor()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', '0') "
+            "ON CONFLICT(user_id) DO NOTHING",
+            (user_id,),
+        )
+        row = cursor.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        balance = _safe_int(row[0]) if row else 0
+        if balance < amount:
+            conn.rollback()
+            return False, balance
+
+        new_balance = balance - amount
+        cursor.execute(
+            "UPDATE economy SET balance = ? WHERE user_id = ?",
+            (str(new_balance), user_id),
+        )
+        conn.commit()
+        return True, new_balance
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+
+
 def transfer_balance(sender_id: int, recipient_id: int, amount: int) -> tuple[bool, int, int]:
     """Atomically transfer holding coins between two users.
 
@@ -460,6 +496,7 @@ def credit_income(user_id: int, amount: int, taxable: bool = True) -> tuple[int,
     cursor = conn.cursor()
     tax = 0
     try:
+        conn.execute("BEGIN IMMEDIATE")
         if taxable and amount > 0:
             row = cursor.execute(
                 "SELECT value FROM config WHERE key = 'income_tax_rate'"
@@ -531,6 +568,50 @@ def update_bank(user_id: int, change: int) -> int:
     cursor.close()
     return new_bank
 
+
+def move_account_funds(
+    user_id: int, amount: int, *, to_bank: bool
+) -> tuple[bool, int, int]:
+    """Atomically move coins between holding and bank balances."""
+    if amount <= 0:
+        raise ValueError("amount must be positive")
+
+    conn = _conn()
+    cursor = conn.cursor()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', '0') "
+            "ON CONFLICT(user_id) DO NOTHING",
+            (user_id,),
+        )
+        row = cursor.execute(
+            "SELECT balance, bank FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        balance, bank = _safe_int(row[0]), _safe_int(row[1])
+        source = balance if to_bank else bank
+        if source < amount:
+            conn.rollback()
+            return False, balance, bank
+
+        if to_bank:
+            balance -= amount
+            bank += amount
+        else:
+            bank -= amount
+            balance += amount
+        cursor.execute(
+            "UPDATE economy SET balance = ?, bank = ? WHERE user_id = ?",
+            (str(balance), str(bank), user_id),
+        )
+        conn.commit()
+        return True, balance, bank
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+
 def get_debt(user_id: int) -> int:
     conn = _conn()
     cursor = conn.cursor()
@@ -572,6 +653,80 @@ def update_debt(user_id: int, change: int) -> int:
     new_debt = _safe_int(row[0]) if row else 0
     cursor.close()
     return new_debt
+
+
+def take_loan(user_id: int, principal: int, debt_increase: int) -> tuple[int, int]:
+    """Atomically credit a loan and record its principal plus interest."""
+    if principal <= 0 or debt_increase < principal:
+        raise ValueError("invalid loan")
+
+    conn = _conn()
+    cursor = conn.cursor()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', '0') "
+            "ON CONFLICT(user_id) DO NOTHING",
+            (user_id,),
+        )
+        row = cursor.execute(
+            "SELECT balance, debt FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        balance = _safe_int(row[0]) + principal
+        debt = _safe_int(row[1]) + debt_increase
+        cursor.execute(
+            "UPDATE economy SET balance = ?, debt = ? WHERE user_id = ?",
+            (str(balance), str(debt), user_id),
+        )
+        conn.commit()
+        return balance, debt
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+
+
+def repay_debt(user_id: int, requested: int) -> tuple[bool, int, int, int]:
+    """Atomically repay up to the current debt from holding coins.
+
+    Returns ``(success, amount_paid, balance, debt)``. ``success`` is false
+    when there is no debt or the holding balance cannot cover the payment.
+    """
+    if requested <= 0:
+        raise ValueError("amount must be positive")
+
+    conn = _conn()
+    cursor = conn.cursor()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', '0') "
+            "ON CONFLICT(user_id) DO NOTHING",
+            (user_id,),
+        )
+        row = cursor.execute(
+            "SELECT balance, debt FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        balance, debt = _safe_int(row[0]), _safe_int(row[1])
+        amount = min(requested, debt)
+        if amount <= 0 or balance < amount:
+            conn.rollback()
+            return False, amount, balance, debt
+
+        balance -= amount
+        debt -= amount
+        cursor.execute(
+            "UPDATE economy SET balance = ?, debt = ? WHERE user_id = ?",
+            (str(balance), str(debt), user_id),
+        )
+        conn.commit()
+        return True, amount, balance, debt
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
 
 def get_all_balances() -> list[dict]:
     conn = _conn()
@@ -671,6 +826,91 @@ def update_house(change: int) -> int:
     return new_val
 
 
+def transfer_to_house(user_id: int, amount: int) -> tuple[bool, int]:
+    """Move holding coins to the house atomically; negative amounts refund."""
+    conn = _conn()
+    cursor = conn.cursor()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', '0') "
+            "ON CONFLICT(user_id) DO NOTHING",
+            (user_id,),
+        )
+        row = cursor.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        balance = _safe_int(row[0])
+        if amount > 0 and balance < amount:
+            conn.rollback()
+            return False, balance
+
+        balance -= amount
+        cursor.execute(
+            "UPDATE economy SET balance = ? WHERE user_id = ?",
+            (str(balance), user_id),
+        )
+        value = str(amount)
+        cursor.execute(
+            "INSERT INTO config (key, value) VALUES ('house_wallet', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = "
+            "CAST(CAST(value AS INTEGER) + CAST(? AS INTEGER) AS TEXT)",
+            (value, value),
+        )
+        conn.commit()
+        _invalidate_config("house_wallet")
+        return True, balance
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+
+
+def claim_house(user_id: int, requested: int | None = None) -> tuple[int, int, int]:
+    """Atomically move available house funds to a user's holding balance."""
+    conn = _conn()
+    cursor = conn.cursor()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = cursor.execute(
+            "SELECT value FROM config WHERE key = 'house_wallet'"
+        ).fetchone()
+        house = _safe_int(row[0]) if row else 0
+        claim = house if requested is None else min(requested, house)
+        if claim <= 0:
+            conn.rollback()
+            return 0, get_balance(user_id), house
+
+        cursor.execute(
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', '0') "
+            "ON CONFLICT(user_id) DO NOTHING",
+            (user_id,),
+        )
+        row = cursor.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        balance = _safe_int(row[0]) + claim
+        new_house = house - claim
+        cursor.execute(
+            "UPDATE economy SET balance = ? WHERE user_id = ?",
+            (str(balance), user_id),
+        )
+        cursor.execute(
+            "INSERT INTO config (key, value) VALUES ('house_wallet', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (str(new_house),),
+        )
+        conn.commit()
+        _invalidate_config("house_wallet")
+        return claim, balance, new_house
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+
+
 # Properties Functions
 def add_property(thread_id: int, owner_id: int, name: str):
     conn = _conn()
@@ -751,6 +991,57 @@ def set_user_job(user_id: int, job_name: str):
     cursor.close()
 
 
+def accept_job(user_id: int, job_name: str, fee: int) -> tuple[bool, int]:
+    """Atomically charge a license fee and replace the user's current job."""
+    if fee < 0:
+        raise ValueError("fee cannot be negative")
+
+    conn = _conn()
+    cursor = conn.cursor()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', '0') "
+            "ON CONFLICT(user_id) DO NOTHING",
+            (user_id,),
+        )
+        row = cursor.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        balance = _safe_int(row[0])
+        if balance < fee:
+            conn.rollback()
+            return False, balance
+
+        balance -= fee
+        cursor.execute(
+            "UPDATE economy SET balance = ? WHERE user_id = ?",
+            (str(balance), user_id),
+        )
+        cursor.execute(
+            """
+            INSERT INTO user_jobs (
+                user_id, job_name, job_xp, job_level, shifts_completed, last_work_time
+            )
+            VALUES (?, ?, 0, 1, 0, NULL)
+            ON CONFLICT(user_id) DO UPDATE SET
+                job_name = excluded.job_name,
+                job_xp = 0,
+                job_level = 1,
+                shifts_completed = 0,
+                last_work_time = NULL
+            """,
+            (user_id, job_name),
+        )
+        conn.commit()
+        return True, balance
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+
+
 def remove_user_job(user_id: int):
     conn = _conn()
     cursor = conn.cursor()
@@ -819,29 +1110,82 @@ def add_item(user_id: int, item: str, quantity: int = 1):
     cursor.close()
 
 
-def remove_item(user_id: int, item: str, quantity: int = 1):
+def purchase_item(user_id: int, item: str, price: int) -> tuple[bool, int]:
+    """Atomically charge for an item and add it to inventory."""
+    if price < 0:
+        raise ValueError("price cannot be negative")
+
     conn = _conn()
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT quantity FROM user_items WHERE user_id = ? AND item = ?",
-        (user_id, item),
-    )
-    row = cursor.fetchone()
-    if not row:
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', '0') "
+            "ON CONFLICT(user_id) DO NOTHING",
+            (user_id,),
+        )
+        row = cursor.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        balance = _safe_int(row[0])
+        if balance < price:
+            conn.rollback()
+            return False, balance
+
+        balance -= price
+        cursor.execute(
+            "UPDATE economy SET balance = ? WHERE user_id = ?",
+            (str(balance), user_id),
+        )
+        cursor.execute(
+            "INSERT INTO user_items (user_id, item, quantity) VALUES (?, ?, 1) "
+            "ON CONFLICT(user_id, item) DO UPDATE SET quantity = quantity + 1",
+            (user_id, item),
+        )
+        conn.commit()
+        return True, balance
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
         cursor.close()
-        return
-    new_qty = row[0] - quantity
-    if new_qty <= 0:
-        cursor.execute(
-            "DELETE FROM user_items WHERE user_id = ? AND item = ?", (user_id, item)
-        )
-    else:
-        cursor.execute(
-            "UPDATE user_items SET quantity = ? WHERE user_id = ? AND item = ?",
-            (new_qty, user_id, item),
-        )
-    conn.commit()
-    cursor.close()
+
+
+def remove_item(user_id: int, item: str, quantity: int = 1) -> bool:
+    """Atomically consume an inventory quantity, returning whether it existed."""
+    if quantity <= 0:
+        raise ValueError("quantity must be positive")
+
+    conn = _conn()
+    cursor = conn.cursor()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = cursor.execute(
+            "SELECT quantity FROM user_items WHERE user_id = ? AND item = ?",
+            (user_id, item),
+        ).fetchone()
+        if not row or row[0] < quantity:
+            conn.rollback()
+            return False
+
+        new_qty = row[0] - quantity
+        if new_qty == 0:
+            cursor.execute(
+                "DELETE FROM user_items WHERE user_id = ? AND item = ?",
+                (user_id, item),
+            )
+        else:
+            cursor.execute(
+                "UPDATE user_items SET quantity = ? WHERE user_id = ? AND item = ?",
+                (new_qty, user_id, item),
+            )
+        conn.commit()
+        return True
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
 
 
 def get_items(user_id: int) -> dict:
@@ -869,46 +1213,64 @@ def has_item(user_id: int, item: str) -> bool:
 
 # Gambling streak + loss insurance
 def _today() -> str:
-    return datetime.utcnow().strftime("%Y-%m-%d")
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
 def claim_daily_streak(user_id: int) -> tuple[int, int]:
-    """returns (streak, bonus). bonus is 0 if already claimed today.
-    streak grows by 1 each consecutive day you gamble, resets on a missed day."""
+    """Claim and credit the daily streak bonus in one transaction."""
     today = _today()
     conn = _conn()
     cursor = conn.cursor()
-    cursor.execute("SELECT last_day, streak FROM gamble_streaks WHERE user_id = ?", (user_id,))
-    row = cursor.fetchone()
-    if row is None:
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = cursor.execute(
+            "SELECT last_day, streak FROM gamble_streaks WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        if row is not None and row[0] == today:
+            conn.rollback()
+            return int(row[1]), 0
+
+        if row is None:
+            streak = 1
+            cursor.execute(
+                "INSERT INTO gamble_streaks (user_id, last_day, streak) VALUES (?, ?, ?)",
+                (user_id, today, streak),
+            )
+        else:
+            last_day, streak = row
+            try:
+                last = datetime.strptime(last_day, "%Y-%m-%d").date()
+                current = datetime.strptime(today, "%Y-%m-%d").date()
+                streak = int(streak) + 1 if (current - last).days == 1 else 1
+            except (TypeError, ValueError):
+                streak = 1
+            cursor.execute(
+                "UPDATE gamble_streaks SET last_day = ?, streak = ? WHERE user_id = ?",
+                (today, streak, user_id),
+            )
+
+        bonus = min(streak * 25, 500)
         cursor.execute(
-            "INSERT INTO gamble_streaks (user_id, last_day, streak) VALUES (?, ?, 1)",
-            (user_id, today),
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, ?, '0', '0') "
+            "ON CONFLICT(user_id) DO UPDATE SET balance = "
+            "CAST(CAST(balance AS INTEGER) + ? AS TEXT)",
+            (user_id, str(100 + bonus), bonus),
+        )
+        cursor.execute(
+            "INSERT INTO config (key, value) VALUES ('house_wallet', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = "
+            "CAST(CAST(value AS INTEGER) - ? AS TEXT)",
+            (str(-bonus), bonus),
         )
         conn.commit()
+        _invalidate_config("house_wallet")
+        return streak, bonus
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
         cursor.close()
-        return 1, min(1 * 25, 500)
-    last_day, streak = row
-    if last_day == today:
-        cursor.close()
-        return streak, 0
-    if last_day is not None:
-        try:
-            last = datetime.strptime(last_day, "%Y-%m-%d").date()
-            cur = datetime.strptime(today, "%Y-%m-%d").date()
-            streak = streak + 1 if (cur - last).days == 1 else 1
-        except ValueError:
-            streak = 1
-    else:
-        streak = 1
-    bonus = min(streak * 25, 500)
-    cursor.execute(
-        "UPDATE gamble_streaks SET last_day = ?, streak = ? WHERE user_id = ?",
-        (today, streak, user_id),
-    )
-    conn.commit()
-    cursor.close()
-    return streak, bonus
 
 
 def track_gamble_result(user_id: int, net_gain: int):
@@ -928,34 +1290,62 @@ def track_gamble_result(user_id: int, net_gain: int):
     cursor.close()
 
 
-def claim_insurance(user_id: int) -> tuple[int, int, bool]:
-    """returns (refund, eligible_losses, already_claimed). refund 10% of today's
-    net losses, capped. marks the day as claimed only when a refund is paid."""
+def claim_insurance(user_id: int) -> tuple[int, int, bool, int]:
+    """Claim, credit, and book today's loss insurance in one transaction."""
     today = _today()
     conn = _conn()
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT net, insurance_claimed FROM gamble_daily WHERE user_id = ? AND day = ?",
-        (user_id, today),
-    )
-    row = cursor.fetchone()
-    if row is None:
-        cursor.close()
-        return 0, 0, False
-    net, claimed = row
-    if claimed:
-        cursor.close()
-        return 0, max(0, -net), True
-    eligible = max(0, -net)
-    refund = min(int(eligible * 0.10), 500)
-    if refund > 0:
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = cursor.execute(
+            "SELECT net, insurance_claimed FROM gamble_daily "
+            "WHERE user_id = ? AND day = ?",
+            (user_id, today),
+        ).fetchone()
+        balance_row = cursor.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        balance = _safe_int(balance_row[0]) if balance_row else 100
+        if row is None:
+            conn.rollback()
+            return 0, 0, False, balance
+
+        net, claimed = row
+        eligible = max(0, -int(net))
+        if claimed:
+            conn.rollback()
+            return 0, eligible, True, balance
+
+        refund = min(int(eligible * 0.10), 500)
+        if refund <= 0:
+            conn.rollback()
+            return 0, eligible, False, balance
+
         cursor.execute(
-            "UPDATE gamble_daily SET insurance_claimed = 1 WHERE user_id = ? AND day = ?",
+            "UPDATE gamble_daily SET insurance_claimed = 1 "
+            "WHERE user_id = ? AND day = ?",
             (user_id, today),
         )
+        cursor.execute(
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, ?, '0', '0') "
+            "ON CONFLICT(user_id) DO UPDATE SET balance = "
+            "CAST(CAST(balance AS INTEGER) + ? AS TEXT)",
+            (user_id, str(100 + refund), refund),
+        )
+        cursor.execute(
+            "INSERT INTO config (key, value) VALUES ('house_wallet', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = "
+            "CAST(CAST(value AS INTEGER) - ? AS TEXT)",
+            (str(-refund), refund),
+        )
         conn.commit()
-    cursor.close()
-    return refund, eligible, False
+        _invalidate_config("house_wallet")
+        return refund, eligible, False, balance + refund
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
 
 
 # Stock Market
@@ -1005,67 +1395,75 @@ def get_all_stock_state() -> dict:
     return state
 
 
-def apply_stock_trade(user_id: int, ticker: str, share_delta: int, coin_delta: int) -> tuple[int, int]:
-    """settle a stock trade in one transaction. returns (new_balance, new_shares).
+def apply_stock_trade(
+    user_id: int,
+    ticker: str,
+    share_delta: int,
+    coin_delta: int,
+    *,
+    allow_negative: bool = False,
+) -> tuple[int, int]:
+    """Validate and settle a stock trade in one transaction."""
+    if share_delta == 0:
+        raise ValueError("share delta cannot be zero")
 
-    the user's coin change and the house's are always equal and opposite:
-    coins leaving the player go to the house and vice versa. previously the
-    caller made these as separate committed writes, so a crash in between
-    left the house books disagreeing with the player's balance.
-
-    mirrors update_balance()'s behaviour for a user with no economy row yet
-    (they start at 100 coins).
-    """
     conn = _conn()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT balance FROM economy WHERE user_id = ?", (user_id,))
-        row = cursor.fetchone()
-        if row is None:
-            new_balance = 100 + coin_delta
-            cursor.execute(
-                "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, ?, '0', '0')",
-                (user_id, str(new_balance)),
-            )
-        else:
-            new_balance = _safe_int(row[0]) + coin_delta
-            cursor.execute(
-                "UPDATE economy SET balance = ? WHERE user_id = ?", (str(new_balance), user_id)
-            )
-
-        house_delta = str(-coin_delta)
+        conn.execute("BEGIN IMMEDIATE")
         cursor.execute(
-            "INSERT INTO config (key, value) VALUES ('house_wallet', ?) ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + CAST(? AS INTEGER)",
-            (house_delta, house_delta),
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', '0') "
+            "ON CONFLICT(user_id) DO NOTHING",
+            (user_id,),
         )
-
-        cursor.execute(
+        balance_row = cursor.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        balance = _safe_int(balance_row[0]) if balance_row else 0
+        held_row = cursor.execute(
             "SELECT shares FROM stock_holdings WHERE user_id = ? AND ticker = ?",
             (user_id, ticker),
+        ).fetchone()
+        held = int(held_row[0]) if held_row else 0
+        new_balance = balance + coin_delta
+        new_shares = held + share_delta
+
+        if new_shares < 0:
+            raise ValueError("insufficient shares")
+        if new_balance < 0 and not allow_negative:
+            raise ValueError("insufficient balance")
+
+        cursor.execute(
+            "UPDATE economy SET balance = ? WHERE user_id = ?",
+            (str(new_balance), user_id),
         )
-        held_row = cursor.fetchone()
-        new_shares = (int(held_row[0]) if held_row else 0) + share_delta
-        if new_shares <= 0:
-            new_shares = 0
+        house_delta = str(-coin_delta)
+        cursor.execute(
+            "INSERT INTO config (key, value) VALUES ('house_wallet', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = "
+            "CAST(CAST(value AS INTEGER) + CAST(? AS INTEGER) AS TEXT)",
+            (house_delta, house_delta),
+        )
+        if new_shares == 0:
             cursor.execute(
                 "DELETE FROM stock_holdings WHERE user_id = ? AND ticker = ?",
                 (user_id, ticker),
             )
         else:
             cursor.execute(
-                "INSERT OR REPLACE INTO stock_holdings (user_id, ticker, shares) VALUES (?, ?, ?)",
+                "INSERT INTO stock_holdings (user_id, ticker, shares) VALUES (?, ?, ?) "
+                "ON CONFLICT(user_id, ticker) DO UPDATE SET shares = excluded.shares",
                 (user_id, ticker, new_shares),
             )
 
         conn.commit()
+        _invalidate_config("house_wallet")
+        return new_balance, new_shares
     except Exception:
         conn.rollback()
         raise
     finally:
         cursor.close()
-
-    _invalidate_config("house_wallet")
-    return new_balance, new_shares
 
 
 def set_stock_price(ticker: str, price: int, hist: list, updated_at: str):
@@ -1155,61 +1553,115 @@ def get_crypto_leaderboard(limit: int = 10) -> list:
     return rows
 
 
-def cashout_crypto(user_id: int, take: int, payout: int, income_tax: int = 0) -> tuple[int, int]:
-    """move mined crypto into the main economy in one transaction.
+def upgrade_crypto_rig(
+    user_id: int, expected_level: int, target_level: int, cost: int
+) -> tuple[str, int]:
+    """Atomically charge for a rig upgrade without overwriting wallet activity."""
+    if target_level <= expected_level or cost < 0:
+        raise ValueError("invalid rig upgrade")
 
-    wallet deduction and economy credit used to be separate commits, so a
-    crash between them either paid out without deducting or deducted without
-    paying. validates the wallet balance inside the same transaction.
-
-    income tax (if any) is deducted in the same transaction: payout is the
-    gross credit, income_tax the cut for the state. returns (new_balance, tax).
-    """
     conn = _conn()
     cursor = conn.cursor()
-    wallet = get_crypto_wallet(user_id)
-    if wallet["balance"] < take:
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        wallet_row = cursor.execute(
+            "SELECT rig_level FROM crypto_wallets WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        current_level = int(wallet_row[0]) if wallet_row else 1
+        if current_level != expected_level:
+            conn.rollback()
+            return "changed", get_balance(user_id)
+
+        cursor.execute(
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', '0') "
+            "ON CONFLICT(user_id) DO NOTHING",
+            (user_id,),
+        )
+        balance_row = cursor.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        balance = _safe_int(balance_row[0])
+        if balance < cost:
+            conn.rollback()
+            return "funds", balance
+
+        balance -= cost
+        cursor.execute(
+            "UPDATE economy SET balance = ? WHERE user_id = ?",
+            (str(balance), user_id),
+        )
+        cursor.execute(
+            "INSERT INTO crypto_wallets "
+            "(user_id, balance, rig_level, mined_total, last_mine) "
+            "VALUES (?, 0, ?, 0, NULL) "
+            "ON CONFLICT(user_id) DO UPDATE SET rig_level = excluded.rig_level",
+            (user_id, target_level),
+        )
+        conn.commit()
+        return "ok", balance
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
         cursor.close()
-        raise ValueError("wallet balance too low")
-    remain = wallet["balance"] - take
-    cursor.execute(
-        "INSERT INTO crypto_wallets (user_id, balance, rig_level, mined_total, last_mine) "
-        "VALUES (?, ?, ?, ?, ?) "
-        "ON CONFLICT(user_id) DO UPDATE SET balance = ?",
-        (user_id, remain, wallet["rig_level"], wallet["mined_total"], wallet["last_mine"], remain),
-    )
-    net = payout - income_tax
-    row = cursor.execute(
-        "SELECT balance FROM economy WHERE user_id = ?", (user_id,)
-    ).fetchone()
-    if row is None:
-        new_balance = 100 + net
+
+
+def cashout_crypto(
+    user_id: int, take: int, payout: int, income_tax: int = 0
+) -> tuple[int, int]:
+    """Atomically exchange mined crypto for holding coins."""
+    if take <= 0 or payout < 0 or income_tax < 0 or income_tax > payout:
+        raise ValueError("invalid cashout")
+
+    conn = _conn()
+    cursor = conn.cursor()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        wallet_row = cursor.execute(
+            "SELECT balance FROM crypto_wallets WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        wallet_balance = int(wallet_row[0]) if wallet_row else 0
+        if wallet_balance < take:
+            raise ValueError("wallet balance too low")
+
         cursor.execute(
-            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, ?, '0', '0')",
-            (user_id, str(new_balance)),
+            "UPDATE crypto_wallets SET balance = ? WHERE user_id = ?",
+            (wallet_balance - take, user_id),
         )
-    else:
-        new_balance = _safe_int(row[0]) + net
+        net = payout - income_tax
         cursor.execute(
-            "UPDATE economy SET balance = ? WHERE user_id = ?", (str(new_balance), user_id)
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, ?, '0', '0') "
+            "ON CONFLICT(user_id) DO UPDATE SET balance = "
+            "CAST(CAST(balance AS INTEGER) + ? AS TEXT)",
+            (user_id, str(100 + net), net),
         )
-    if income_tax:
-        cursor.execute(
-            "INSERT INTO config (key, value) VALUES ('house_wallet', ?) "
-            "ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + CAST(? AS INTEGER)",
-            (str(income_tax), str(income_tax)),
-        )
-        collected = get_config("income_tax_collected", "0")
-        cursor.execute(
-            "INSERT INTO config (key, value) VALUES ('income_tax_collected', ?) "
-            "ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + CAST(? AS INTEGER)",
-            (str(int(collected) + income_tax), str(income_tax)),
-        )
-    conn.commit()
-    cursor.close()
-    _invalidate_config("house_wallet")
-    _invalidate_config("income_tax_collected")
-    return new_balance, income_tax
+        balance_row = cursor.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        new_balance = _safe_int(balance_row[0])
+
+        if income_tax:
+            cursor.execute(
+                "INSERT INTO config (key, value) VALUES ('house_wallet', ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = "
+                "CAST(CAST(value AS INTEGER) + ? AS TEXT)",
+                (str(income_tax), income_tax),
+            )
+            cursor.execute(
+                "INSERT INTO config (key, value) VALUES ('income_tax_collected', ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = "
+                "CAST(CAST(value AS INTEGER) + ? AS TEXT)",
+                (str(income_tax), income_tax),
+            )
+        conn.commit()
+        _invalidate_config("house_wallet")
+        _invalidate_config("income_tax_collected")
+        return new_balance, income_tax
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
 
 
 # 宠物系统 (Pet System)
@@ -1354,6 +1806,56 @@ def add_car(user_id: int, car_key: str, name: str, tier: int) -> bool:
     return inserted
 
 
+def purchase_car(
+    user_id: int, car_key: str, name: str, tier: int, price: int
+) -> tuple[str, int]:
+    """Atomically buy a car, returning status and the remaining balance."""
+    if price < 0:
+        raise ValueError("price cannot be negative")
+
+    conn = _conn()
+    cursor = conn.cursor()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        existing = cursor.execute(
+            "SELECT 1 FROM user_cars WHERE user_id = ? AND car_key = ?",
+            (user_id, car_key),
+        ).fetchone()
+        if existing:
+            conn.rollback()
+            return "owned", get_balance(user_id)
+
+        cursor.execute(
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', '0') "
+            "ON CONFLICT(user_id) DO NOTHING",
+            (user_id,),
+        )
+        row = cursor.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        balance = _safe_int(row[0])
+        if balance < price:
+            conn.rollback()
+            return "funds", balance
+
+        balance -= price
+        cursor.execute(
+            "UPDATE economy SET balance = ? WHERE user_id = ?",
+            (str(balance), user_id),
+        )
+        cursor.execute(
+            "INSERT INTO user_cars (user_id, car_key, name, tier) VALUES (?, ?, ?, ?)",
+            (user_id, car_key, name, tier),
+        )
+        conn.commit()
+        return "ok", balance
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+
+
 def record_car_drive(user_id: int, car_key: str, miles: int, wear: int, earned: int, last_drive: str) -> dict:
     conn = _conn()
     cursor = conn.cursor()
@@ -1373,15 +1875,57 @@ def record_car_drive(user_id: int, car_key: str, miles: int, wear: int, earned: 
     return get_car(user_id, car_key)
 
 
-def repair_car(user_id: int, car_key: str):
+def repair_car_with_payment(
+    user_id: int, car_key: str, *, free: bool = False
+) -> tuple[str, int, int]:
+    """Atomically calculate, charge, and apply a repair."""
     conn = _conn()
     cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE user_cars SET wear = 0 WHERE user_id = ? AND car_key = ?",
-        (user_id, car_key),
-    )
-    conn.commit()
-    cursor.close()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        car = cursor.execute(
+            "SELECT tier, wear FROM user_cars WHERE user_id = ? AND car_key = ?",
+            (user_id, car_key),
+        ).fetchone()
+        if car is None:
+            conn.rollback()
+            return "missing", 0, get_balance(user_id)
+
+        tier, wear = int(car[0]), int(car[1])
+        if wear <= 0:
+            conn.rollback()
+            return "clean", 0, get_balance(user_id)
+        cost = 0 if free else wear * tier * 35
+
+        cursor.execute(
+            "INSERT INTO economy (user_id, balance, bank, debt) VALUES (?, '100', '0', '0') "
+            "ON CONFLICT(user_id) DO NOTHING",
+            (user_id,),
+        )
+        row = cursor.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        balance = _safe_int(row[0])
+        if balance < cost:
+            conn.rollback()
+            return "funds", cost, balance
+
+        balance -= cost
+        cursor.execute(
+            "UPDATE economy SET balance = ? WHERE user_id = ?",
+            (str(balance), user_id),
+        )
+        cursor.execute(
+            "UPDATE user_cars SET wear = 0 WHERE user_id = ? AND car_key = ?",
+            (user_id, car_key),
+        )
+        conn.commit()
+        return "ok", cost, balance
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
 
 
 def get_all_car_earnings(limit: int = 10) -> list[dict]:

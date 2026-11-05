@@ -142,8 +142,6 @@ async def claim_streak_bonus(ctx):
         return 0
     streak, bonus = await asyncio.to_thread(db.claim_daily_streak, ctx.author.id)
     if bonus > 0:
-        await asyncio.to_thread(db.update_balance, ctx.author.id, bonus)
-        await asyncio.to_thread(db.update_house, -bonus)
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         await ctx.reply(f"🔥 daily gambling streak — day {streak}! +{bonus} {coin_emoji} streak bonus")
     return bonus

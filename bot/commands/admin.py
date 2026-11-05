@@ -144,33 +144,51 @@ def setup_admin(client: commands.Bot):
 
         if type == "vc":
             # vc logic
-            cost = 100 # lets set a price
-            balance = await asyncio.to_thread(db.get_balance, ctx.author.id)
-            if balance < cost:
-                await ctx.reply(f"you don't have enough coins. a vc property costs {cost} coins (your balance: {balance})")
+            cost = 100
+            charged, new_balance = await asyncio.to_thread(
+                db.debit_balance, ctx.author.id, cost
+            )
+            if not charged:
+                await ctx.reply(f"you don't have enough coins. a vc property costs {cost} coins (your balance: {new_balance})")
                 return
 
-            new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, -cost)
-            
-            # create role
-            role_name = f"{ctx.author.display_name}'s property"
-            role = await ctx.guild.create_role(name=role_name, reason="property purchase")
-            await ctx.author.add_roles(role)
-            
-            # create category
-            category = discord.utils.get(ctx.guild.categories, name="vc-properties")
-            if not category:
-                category = await ctx.guild.create_category("vc-properties")
-            
-            # create vc
-            overwrites = {
-                ctx.guild.default_role: discord.PermissionOverwrite(connect=False),
-                role: discord.PermissionOverwrite(connect=True, view_channel=True),
-                ctx.guild.me: discord.PermissionOverwrite(connect=True, view_channel=True)
-            }
-            vc = await ctx.guild.create_voice_channel(name=name or f"{ctx.author.display_name}'s-vc", category=category, overwrites=overwrites)
-            
-            await asyncio.to_thread(db.add_property, vc.id, ctx.author.id, "vc")
+            role = None
+            vc = None
+            try:
+                role_name = f"{ctx.author.display_name}'s property"
+                role = await ctx.guild.create_role(name=role_name, reason="property purchase")
+                await ctx.author.add_roles(role)
+
+                category = discord.utils.get(ctx.guild.categories, name="vc-properties")
+                if not category:
+                    category = await ctx.guild.create_category("vc-properties")
+
+                overwrites = {
+                    ctx.guild.default_role: discord.PermissionOverwrite(connect=False),
+                    role: discord.PermissionOverwrite(connect=True, view_channel=True),
+                    ctx.guild.me: discord.PermissionOverwrite(connect=True, view_channel=True),
+                }
+                vc = await ctx.guild.create_voice_channel(
+                    name=name or f"{ctx.author.display_name}'s-vc",
+                    category=category,
+                    overwrites=overwrites,
+                )
+                await asyncio.to_thread(db.add_property, vc.id, ctx.author.id, "vc")
+            except Exception as e:
+                await asyncio.to_thread(db.update_balance, ctx.author.id, cost)
+                if vc is not None:
+                    try:
+                        await vc.delete(reason="property purchase failed")
+                    except discord.HTTPException:
+                        pass
+                if role is not None:
+                    try:
+                        await role.delete(reason="property purchase failed")
+                    except discord.HTTPException:
+                        pass
+                await ctx.reply(f"failed to create vc property: {e}")
+                return
+
             await ctx.reply(f"you bought a VC property {vc.mention}! role {role.mention} added. balance: {new_balance}")
             return
 
@@ -187,32 +205,40 @@ def setup_admin(client: commands.Bot):
             return
             
         cost = 50
-        balance = await asyncio.to_thread(db.get_balance, ctx.author.id)
-        if balance < cost:
-            await ctx.reply(f"you don't have enough coins. a property costs {cost} coins (your balance: {balance})")
+        charged, new_balance = await asyncio.to_thread(
+            db.debit_balance, ctx.author.id, cost
+        )
+        if not charged:
+            await ctx.reply(f"you don't have enough coins. a property costs {cost} coins (your balance: {new_balance})")
             return
-            
-        new_balance = await asyncio.to_thread(db.update_balance, ctx.author.id, -cost)
-        
+
         thread_name = name or f"{ctx.author.display_name}s property"
         thread_name = thread_name.lower().replace(" ", "-")
-        
+
+        thread = None
         try:
             thread = await property_channel.create_thread(
                 name=thread_name,
-                type=discord.ChannelType.private_thread
+                type=discord.ChannelType.private_thread,
             )
-            
             await thread.add_user(ctx.author)
             await asyncio.to_thread(db.add_property, thread.id, ctx.author.id, thread_name)
-            
-            coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-            await ctx.reply(f"you bought property {thread.mention}! deducted {cost} {coin_emoji} (remaining: {new_balance} {coin_emoji})")
-            await thread.send(f"welcome to your private property {ctx.author.mention}! this thread is yours. enjoy")
-            
         except Exception as e:
             await asyncio.to_thread(db.update_balance, ctx.author.id, cost)
+            if thread is not None:
+                try:
+                    await thread.delete()
+                except discord.HTTPException:
+                    pass
             await ctx.reply(f"failed to create thread: {e}")
+            return
+
+        coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
+        await ctx.reply(f"you bought property {thread.mention}! deducted {cost} {coin_emoji} (remaining: {new_balance} {coin_emoji})")
+        try:
+            await thread.send(f"welcome to your private property {ctx.author.mention}! this thread is yours. enjoy")
+        except discord.HTTPException:
+            pass
 
     @property_group.command(name="remove", description="remove a property (admin only)")
     @is_admin()

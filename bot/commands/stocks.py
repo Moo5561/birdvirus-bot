@@ -287,9 +287,19 @@ def setup_stocks(client: commands.Bot):
 
         game_lock(ctx)
         try:
-            new_balance, held = await asyncio.to_thread(
-                db.apply_stock_trade, ctx.author.id, ticker, shares, -cost
-            )
+            try:
+                new_balance, held = await asyncio.to_thread(
+                    db.apply_stock_trade,
+                    ctx.author.id,
+                    ticker,
+                    shares,
+                    -cost,
+                    allow_negative=is_nightly(ctx.bot),
+                )
+            except ValueError:
+                balance = await asyncio.to_thread(db.get_balance, ctx.author.id)
+                await ctx.reply(f"you can't afford {shares} shares of {ticker} ({cost} coins, balance: {balance})")
+                return
             coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
             await ctx.reply(
                 f"📈 bought {shares} share(s) of {stock['emoji']} **{ticker}** @ {coin_emoji} {_s(price)} each "
@@ -325,9 +335,13 @@ def setup_stocks(client: commands.Bot):
 
         game_lock(ctx)
         try:
-            new_balance, remaining = await asyncio.to_thread(
-                db.apply_stock_trade, ctx.author.id, ticker, -shares, proceeds
-            )
+            try:
+                new_balance, remaining = await asyncio.to_thread(
+                    db.apply_stock_trade, ctx.author.id, ticker, -shares, proceeds
+                )
+            except ValueError:
+                await ctx.reply(f"you don't have {shares} share(s) of {ticker} anymore")
+                return
             coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
             await ctx.reply(
                 f"📉 sold {shares} share(s) of {stock['emoji']} **{ticker}** @ {coin_emoji} {_s(price)} each "

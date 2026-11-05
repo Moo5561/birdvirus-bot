@@ -104,23 +104,22 @@ def setup_cars(client: commands.Bot):
             return
 
         car_data = CAR_BY_KEY[key]
-        if await asyncio.to_thread(db.get_car, ctx.author.id, key):
-            await _report(ctx, f"you already own the **{car_data['name']}**.")
-            return
-
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
         cost = 0 if is_nightly(ctx.bot) else car_data["price"]
-        bal = await asyncio.to_thread(db.get_balance, ctx.author.id)
-        if bal < cost and not is_nightly(ctx.bot):
-            await _report(ctx, f"the **{car_data['name']}** costs {_s(cost)} {coin_emoji}. you have {_s(bal)}.")
+        status, balance = await asyncio.to_thread(
+            db.purchase_car,
+            ctx.author.id,
+            key,
+            car_data["name"],
+            car_data["tier"],
+            cost,
+        )
+        if status == "owned":
+            await _report(ctx, f"you already own the **{car_data['name']}**.")
             return
-
-        inserted = await asyncio.to_thread(db.add_car, ctx.author.id, key, car_data["name"], car_data["tier"])
-        if not inserted:
-            await _report(ctx, "garage paperwork got weird. you probably already own that.")
+        if status == "funds":
+            await _report(ctx, f"the **{car_data['name']}** costs {_s(cost)} {coin_emoji}. you have {_s(balance)}.")
             return
-        if cost:
-            await asyncio.to_thread(db.update_balance, ctx.author.id, -cost)
 
         await _report(
             ctx,
@@ -222,19 +221,23 @@ def setup_cars(client: commands.Bot):
         if not owned:
             await _report(ctx, "you don't own that car.")
             return
-        if owned["wear"] <= 0:
-            await _report(ctx, f"the **{owned['name']}** is already fine. suspicious, but fine.")
-            return
 
         coin_emoji = await asyncio.to_thread(db.get_config, "coin_emoji", "🪙")
-        cost = 0 if is_nightly(ctx.bot) else _repair_cost(owned)
-        bal = await asyncio.to_thread(db.get_balance, ctx.author.id)
-        if bal < cost and not is_nightly(ctx.bot):
-            await _report(ctx, f"repairs cost {_s(cost)} {coin_emoji}. you have {_s(bal)}.")
+        status, cost, balance = await asyncio.to_thread(
+            db.repair_car_with_payment,
+            ctx.author.id,
+            key,
+            free=is_nightly(ctx.bot),
+        )
+        if status == "clean":
+            await _report(ctx, f"the **{owned['name']}** is already fine. suspicious, but fine.")
             return
-        if cost:
-            await asyncio.to_thread(db.update_balance, ctx.author.id, -cost)
-        await asyncio.to_thread(db.repair_car, ctx.author.id, key)
+        if status == "missing":
+            await _report(ctx, "you don't own that car.")
+            return
+        if status == "funds":
+            await _report(ctx, f"repairs cost {_s(cost)} {coin_emoji}. you have {_s(balance)}.")
+            return
         await _report(ctx, f"repaired **{owned['name']}** for {_s(cost)} {coin_emoji}.", title="car repaired", color=0x2ecc71)
 
     @client.hybrid_command(name="cartop", description="car earnings leaderboard")
