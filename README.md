@@ -45,7 +45,9 @@ python main.py --host "your_name"
 
 ## commands
 
-all commands are hybrid — slash and prefix both work. prefix is `%` for the main bot, `ht!` for nightly. every command is available in dms and as a user install.
+slash commands work in servers, dms, and group dms unless they require a server, like voice, property, and leaderboard commands. for group dms or dms with other users, add the app to your discord account. self-hosts need both server install and user install enabled in the discord developer portal and must restart the bot to sync the commands.
+
+prefix commands use `%` for the main bot and `ht!` for nightly wherever the bot can receive messages.
 
 | category | commands |
 |----------|----------|
@@ -57,14 +59,17 @@ all commands are hybrid — slash and prefix both work. prefix is `%` for the ma
 | jobs | `/job list`, `/job info`, `/job apply`, `/job work`, `/job quit`, `/job beg` |
 | voice | `/vc join`, `/vc leave`, `/vc stop`, `/vc bird`, `/vc fart`, `/vc droid`, `/play`, `/stop`, `/bad apple` |
 | properties | `/property register`, `/property buy`, `/property remove`, `/property invite`, `/property kick` |
-| utility | `/ping`, `/gif`, `/version`, `/vote`, `/chat`, `/chat_reset`, `/say`, `/eatbomb`, `/tts`, `/numbairy`, `/internet search` |
+| utility | `/ping`, `/gif`, `/httpbird`, `/version`, `/vote`, `/chat`, `/chat_reset`, `/say`, `/eatbomb`, `/tts`, `/numbairy`, `/internet search` |
 | admin | `/ban`, `/unban`, `/view say`, `/view logs`, `/clear saylist`, `/giveitem`, `/removeitem`, `/setshop`, `/setillegal` |
 | economy admin | `/ec emoji`, `/ec reset`, `/ec set`, `/ec setbank`, `/ec add`, `/ec taxrate`, `/ec taxinfo`, `/ec debtforgive`, `/ec debtlist` |
 | bot devs | `/update` |
 
+try `/httpbird code:404` or `%httpbird 404` for a birdvirus status card. 22 codes have their own photo; other recognized codes use the birdvirus crow.
+the photos were reframed and resized. their [credits and licenses](bot/assets/httpbird/credits.json) also appear under each card; share-alike cards retain the indicated license.
+
 ## contributing
 
-`AGENTS.md` has the rules, `CLAUDE.md` has the architecture, and `DEVELOPMENT.md` has per-subsystem detail. verify syntax and the database transaction regressions with:
+`AGENTS.md` has the rules, `CLAUDE.md` has the architecture, and `DEVELOPMENT.md` has per-subsystem detail. verify syntax and run the regression tests with:
 
 ```bash
 python -m py_compile main.py bot/*.py bot/commands/*.py
@@ -72,3 +77,9 @@ python -m unittest discover -s tests -p "*_test.py"
 ```
 
 github actions runs both checks on every push and pull request.
+
+after installing the bot dependencies, verify the discord sync payload without logging in:
+
+```bash
+python -m unittest discover -s tests -p "discord_registration_smoke.py"
+```

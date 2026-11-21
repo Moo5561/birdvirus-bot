@@ -6,7 +6,7 @@ from discord import app_commands
 import bot.db as db
 import bot.bans as bans
 import os
-from bot.commands import is_admin, is_bot_dev, _is_configured_admin, _s
+from bot.commands import guild_slash_only, is_admin, is_bot_dev, _is_configured_admin, _s
 from bot.commands.economy import _to_bet, _to_integer, _to_nonnegative
 
 
@@ -102,6 +102,7 @@ def setup_admin(client: commands.Bot):
 
     # Property Group
     @client.hybrid_group(name="property", description="property commands")
+    @guild_slash_only
     async def property_group(ctx: commands.Context):
         pass
 

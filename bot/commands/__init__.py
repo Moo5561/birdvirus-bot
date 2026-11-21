@@ -97,9 +97,11 @@ def is_admin():
         if await _is_configured_admin(ctx.author.id):
             return True
 
-        # guild_permissions only exists on Member — commands work in dms too
-        if ctx.guild is not None and ctx.author.guild_permissions.administrator:
-            return True
+        # A personal install must not give admins of unrelated servers bot-wide access.
+        if ctx.guild is not None and (
+            ctx.interaction is None or ctx.interaction.is_guild_integration()
+        ):
+            return ctx.author.guild_permissions.administrator
 
         return False
 
@@ -111,6 +113,14 @@ def is_bot_dev():
         return await _is_configured_admin(ctx.author.id)
 
     return commands.check(predicate)
+
+
+def guild_slash_only(callback):
+    """Keep commands that need the server bot out of user installs and private channels."""
+    callback = discord.app_commands.allowed_contexts(
+        guilds=True, dms=False, private_channels=False
+    )(callback)
+    return discord.app_commands.allowed_installs(guilds=True, users=False)(callback)
 
 
 def _s(num):
@@ -209,6 +219,7 @@ from .crash import setup_crash
 from .crypto import setup_crypto
 from .pet import setup_pet
 from .cars import setup_car
+from .httpbird import setup_httpbird
 
 
 def setup(client: commands.Bot):
@@ -227,3 +238,4 @@ def setup(client: commands.Bot):
     setup_crypto(client)
     setup_pet(client)
     setup_car(client)
+    setup_httpbird(client)

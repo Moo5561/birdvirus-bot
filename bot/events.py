@@ -62,7 +62,6 @@ def setup(client: commands.Bot):
             raise UserBanned()
         return True
 
-    @client.tree.interaction_check
     async def globally_block_banned_interactions(interaction: discord.Interaction):
         try:
             banned = await bans.read_banned_users()
@@ -71,6 +70,8 @@ def setup(client: commands.Bot):
         if interaction.user.id in banned:
             return False
         return True
+
+    client.tree.interaction_check = globally_block_banned_interactions
 
     @client.listen("on_message")
     async def on_message(message: discord.Message):

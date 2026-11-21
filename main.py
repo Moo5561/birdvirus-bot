@@ -100,15 +100,12 @@ client = BirdBot(
     command_prefix=get_prefix,
     intents=intents,
     activity=discord.CustomActivity(name=f"loading..."),
+    allowed_contexts=discord.app_commands.AppCommandContext(
+        guild=True, dm_channel=True, private_channel=True
+    ),
+    allowed_installs=discord.app_commands.AppInstallationType(guild=True, user=True),
 )
 client._host = args.host
-
-client.tree.default_allowed_contexts = discord.app_commands.AppCommandContext(
-    guild=True, dm_channel=True, private_channel=True
-)
-client.tree.default_allowed_installs = discord.app_commands.AppInstallationType(
-    guild=True, user=True
-)
 
 bot.events.setup(client)
 bot.commands.setup(client)

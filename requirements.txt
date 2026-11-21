@@ -5,3 +5,4 @@ playwright
 PyNaCl
 g4f
 matplotlib
+Pillow>=10.1
