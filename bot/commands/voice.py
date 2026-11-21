@@ -7,7 +7,7 @@ import discord.ext.commands as commands
 from discord.ext import tasks
 from discord import app_commands
 import bot.db as db
-from bot.commands import audio_queues, voice_joiners, is_nightly
+from bot.commands import audio_queues, guild_slash_only, voice_joiners, is_nightly
 from bot.config import OWNER_IDS
 
 AUDIO_EXTS = (".mp3", ".wav", ".ogg", ".m4a", ".aac")
@@ -82,6 +82,7 @@ def setup_voice(client: commands.Bot):
 
     # VC Group
     @client.hybrid_group(name="vc", description="voice channel commands")
+    @guild_slash_only
     async def vc_group(ctx: commands.Context):
         pass
 
@@ -258,6 +259,7 @@ def setup_voice(client: commands.Bot):
     @client.hybrid_command(
         name="stop", description="stop the audio playback and clear the queue"
     )
+    @guild_slash_only
     async def stop_cmd(ctx: commands.Context):
         if ctx.voice_client is None:
             await ctx.reply("i'm not in a voice channel")
@@ -279,6 +281,7 @@ def setup_voice(client: commands.Bot):
         name="play",
         description="play a sound from a link, uploaded file, or attachment",
     )
+    @guild_slash_only
     @app_commands.describe(
         link="the link (youtube/direct) to play", file="an uploaded audio file to play"
     )
@@ -361,6 +364,7 @@ def setup_voice(client: commands.Bot):
 
     # Bad Group
     @client.hybrid_group(name="bad", description="bad commands")
+    @guild_slash_only
     async def bad_group(ctx: commands.Context):
         pass
 

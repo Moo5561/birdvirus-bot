@@ -5,6 +5,7 @@ import discord.ext.commands as commands
 from discord import app_commands
 import bot.db as db
 from bot.commands import is_admin, is_nightly, game_lock, game_unlock, _s, claim_streak_bonus, track_gamble, is_dev, credit_income
+from bot.commands import guild_slash_only
 from bot.commands.blackjack import BlackjackView, draw_card
 from bot.commands.horserace import HorseRaceView
 from bot.commands.catrace import CatRaceView
@@ -938,6 +939,7 @@ def setup_economy(client: commands.Bot):
             await ctx.reply(f"house: {house} {coin_emoji}\nusage: `/pure bailout <amount>` to inject, `/pure bailout wipe` to zero it")
 
     @client.hybrid_command(name="leaderboard", description="view the richest players")
+    @guild_slash_only
     @app_commands.describe(page="page number to view")
     async def leaderboard(ctx: commands.Context, page: int = 1):
         if ctx.guild is None:

@@ -45,7 +45,9 @@ python main.py --host "your_name"
 
 ## commands
 
-all commands are hybrid — slash and prefix both work. prefix is `%` for the main bot, `ht!` for nightly. every command is available in dms and as a user install.
+slash commands work in servers, dms, and group dms unless they require a server, like voice, property, and leaderboard commands. for group dms or dms with other users, add the app to your discord account. self-hosts need both server install and user install enabled in the discord developer portal and must restart the bot to sync the commands.
+
+prefix commands use `%` for the main bot and `ht!` for nightly wherever the bot can receive messages.
 
 | category | commands |
 |----------|----------|
@@ -75,3 +77,9 @@ python -m unittest discover -s tests -p "*_test.py"
 ```
 
 github actions runs both checks on every push and pull request.
+
+after installing the bot dependencies, verify the discord sync payload without logging in:
+
+```bash
+python -m unittest discover -s tests -p "discord_registration_smoke.py"
+```

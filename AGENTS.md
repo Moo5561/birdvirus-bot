@@ -14,7 +14,7 @@ be yourself, but be direct. no padding, no "great question", no summarizing back
 
 - **db calls block.** `bot/db.py` is synchronous `sqlite3`. every call from command code goes through `await asyncio.to_thread(...)`. no exceptions.
 - **register your module.** there are no cogs. a new file in `bot/commands/` must export `setup_<name>(client)` and be imported + called in `bot/commands/__init__.py:setup()`, or it silently does nothing.
-- **guard for dms.** `default_allowed_contexts` in `main.py` enables dms, group dms, and user installs globally, so every new command lands there whether you meant it to or not. anything touching `ctx.guild` or `ctx.author.guild_permissions` needs an explicit `ctx.guild is None` check first.
+- **guard for dms.** `allowed_contexts` and `allowed_installs` in `main.py` enable dms, group dms, and user installs by default. use `@guild_slash_only` for server-only slash commands. anything touching `ctx.guild` or `ctx.author.guild_permissions` needs an explicit `ctx.guild is None` check first.
 - **don't hand-edit `version.txt`.** a github action rewrites it on every push to `main`.
 - **don't commit** `.env`, `cookies.txt`, `bot.log`, or `birdvirus.db`. all four are gitignored; the database was untracked deliberately, don't add it back.
 - **verify before you claim done:** run `python -m py_compile main.py bot/*.py bot/commands/*.py` and `python -m unittest discover -s tests -p "*_test.py"`, then read the diff.

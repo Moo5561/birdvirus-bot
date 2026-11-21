@@ -277,8 +277,6 @@ def setup_utility(client: commands.Bot):
 
     # chat
     @client.hybrid_command(name="chat", description="chat with the birdvirus bot")
-    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
-    @app_commands.allowed_installs(guilds=True, users=True)
     @app_commands.describe(message="what you want to say")
     async def chat(ctx: commands.Context, *, message: str):
         try:
@@ -450,6 +448,9 @@ def setup_utility(client: commands.Bot):
     @app_commands.describe(message="what you want the bot to say")
     async def say(ctx: commands.Context, message: str):
         await asyncio.to_thread(db.log_say, ctx.author.id, ctx.author.name, message)
+        if ctx.interaction and ctx.interaction.is_user_integration():
+            await ctx.reply(message, allowed_mentions=discord.AllowedMentions.none())
+            return
         if ctx.interaction:
             await ctx.interaction.response.send_message("sent", ephemeral=True)
             await ctx.channel.send(message)
