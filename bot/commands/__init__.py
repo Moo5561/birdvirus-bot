@@ -209,6 +209,7 @@ from .crash import setup_crash
 from .crypto import setup_crypto
 from .pet import setup_pet
 from .cars import setup_car
+from .httpbird import setup_httpbird
 
 
 def setup(client: commands.Bot):
@@ -227,3 +228,4 @@ def setup(client: commands.Bot):
     setup_crypto(client)
     setup_pet(client)
     setup_car(client)
+    setup_httpbird(client)
