@@ -64,7 +64,7 @@ prefix commands use `%` for the main bot and `ht!` for nightly wherever the bot 
 | economy admin | `/ec emoji`, `/ec reset`, `/ec set`, `/ec setbank`, `/ec add`, `/ec taxrate`, `/ec taxinfo`, `/ec debtforgive`, `/ec debtlist` |
 | bot devs | `/update` |
 
-try `/httpbird code:404` or `%httpbird 404` for a birdvirus status card. 22 codes have their own photo; other recognized codes use the birdvirus crow.
+open `/httpbird` and pick a status from the `code` suggestions, or search by number or name. `%httpbird 404` still works. 22 codes have their own photo; other recognized codes use the birdvirus crow.
 the photos were reframed and resized. their [credits and licenses](bot/assets/httpbird/credits.json) also appear under each card; share-alike cards retain the indicated license.
 
 ## contributing

@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 from discord.ext import commands
+from discord.ext.commands.view import StringView
 
 
 class DiscordRegistrationTest(unittest.IsolatedAsyncioTestCase):
@@ -37,6 +38,50 @@ class DiscordRegistrationTest(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(command["contexts"], [0] if name in guild_only else [0, 1, 2])
                 self.assertEqual(command["integration_types"], [0] if name in guild_only else [0, 1])
         self.assertIn("httpcat", {subcommand["name"] for subcommand in payload["internet"]["options"]})
+        option, = payload["httpbird"]["options"]
+        self.assertEqual(option["name"], "code")
+        self.assertTrue(option["required"])
+        self.assertTrue(option["autocomplete"])
+
+    async def test_httpbird_suggests_photos_and_searches_fallback_codes(self):
+        from bot.commands.httpbird import _PHOTO_CREDITS
+
+        command = self.client.tree.get_command("httpbird")
+
+        async def suggest(query):
+            response = Mock(is_done=Mock(return_value=False), autocomplete=AsyncMock())
+            interaction = SimpleNamespace(response=response)
+            await command._invoke_autocomplete(interaction, "code", SimpleNamespace(code=query))
+            response.autocomplete.assert_awaited_once()
+            choices, = response.autocomplete.await_args.args
+            self.assertLessEqual(len(choices), 25)
+            return {choice.value: choice.name for choice in choices}
+
+        self.assertEqual(set(await suggest("")), set(_PHOTO_CREDITS))
+        self.assertEqual(await suggest("  4 NOT FOUND "), {"404": "404 not found"})
+        self.assertEqual(await suggest("teapot"), {"418": "418 i'm a teapot"})
+        self.assertEqual(await suggest("202"), {"202": "202 accepted"})
+        self.assertEqual(await suggest("999"), {})
+        client_errors = await suggest("4")
+        self.assertTrue(client_errors)
+        self.assertTrue(all(code.startswith("4") for code in client_errors))
+
+    async def test_httpbird_prefix_still_accepts_a_number(self):
+        command = self.client.get_command("httpbird")
+        ctx = commands.Context(
+            message=Mock(content="%httpbird 202", attachments=[]),
+            bot=self.client,
+            view=StringView(" 202"),
+            prefix="%",
+            invoked_with="httpbird",
+            command=command,
+        )
+        ctx.reply = AsyncMock()
+        await command._parse_arguments(ctx)
+        await command.callback(*ctx.args, **ctx.kwargs)
+        ctx.reply.assert_awaited_once()
+        self.assertEqual(ctx.reply.await_args.args, ("202 accepted",))
+        self.assertEqual(ctx.reply.await_args.kwargs["file"].filename, "httpbird-202.jpg")
 
     async def test_personal_install_does_not_inherit_server_admin_access(self):
         author = SimpleNamespace(id=123, guild_permissions=SimpleNamespace(administrator=True))
