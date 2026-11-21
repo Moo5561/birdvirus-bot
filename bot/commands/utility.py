@@ -528,12 +528,31 @@ def setup_utility(client: commands.Bot):
     async def internet_group(ctx: commands.Context):
         pass
 
-    @internet_get_command := internet_group.command(
-        name="get", description="get internet stuff"
+    @internet_httpcat_command := internet_group.command(
+        name="httpcat", description="pull a random cat from http.cat"
     )
-    async def internet_get(ctx: commands.Context):
-        await ctx.reply("no we are not using ts lol")
+    @app_commands.describe(code="optional http status code (leave blank for random)")
+    async def internet_httpcat(ctx: commands.Context, code: int | None = None):
+        http_cat_codes = [
+            100, 101, 102, 103,
+            200, 201, 202, 203, 204, 206, 207, 208, 226,
+            300, 301, 302, 303, 304, 305, 307, 308,
+            400, 401, 402, 403, 404, 405, 406, 407, 408, 409,
+            410, 411, 412, 413, 414, 415, 416, 417, 418, 420,
+            421, 422, 423, 424, 425, 426, 428, 429, 431, 444,
+            450, 451, 497, 498, 499,
+            500, 501, 502, 503, 504, 506, 507, 508, 509, 510,
+            511, 521, 522, 523, 525, 530, 599
+        ]
+        chosen = code if code in http_cat_codes else random.choice(http_cat_codes)
 
+        embed = discord.Embed(
+            title=f"HTTP {chosen}",
+            url=f"https://http.cat/status/{chosen}",
+            color=discord.Color.orange(),
+        )
+        embed.set_image(url=f"https://http.cat/{chosen}.jpg")
+        await ctx.reply(embed=embed)
     @internet_search_command := internet_group.command(
         name="search", description="search the web on duckduckgo and describe results"
     )
