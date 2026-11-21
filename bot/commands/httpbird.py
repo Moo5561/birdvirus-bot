@@ -82,7 +82,7 @@ def _photo_credit(photo: dict[str, str]) -> str:
 
 def setup_httpbird(client: commands.Bot):
     @client.hybrid_command(name="httpbird", description="get a bird for an http status code")
-    @app_commands.describe(code="the three-digit http status code, like 404")
+    @app_commands.describe(code="select a status, or search by code or name")
     async def httpbird_cmd(ctx: commands.Context, code: str):
         if len(code) != 3 or not code.isascii() or not code.isdecimal():
             await ctx.reply("give me a three-digit http status code like `404`", ephemeral=True)
@@ -118,3 +118,22 @@ def setup_httpbird(client: commands.Bot):
                 )
             finally:
                 attachment.close()
+
+    @httpbird_cmd.autocomplete("code")
+    async def autocomplete_code(_interaction: discord.Interaction, current: str):
+        terms = current.lower().split()
+        choices = []
+        for status in HTTPStatus:
+            code = str(status.value)
+            phrase = status.phrase.lower()
+            if not terms and code not in _PHOTO_CREDITS:
+                continue
+            matches = all(
+                code.startswith(term) if term.isdecimal() else term in phrase
+                for term in terms
+            )
+            if matches:
+                choices.append(app_commands.Choice(name=f"{code} {phrase}", value=code))
+                if len(choices) == 25:
+                    break
+        return choices
